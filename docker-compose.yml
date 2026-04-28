@@ -1,0 +1,41 @@
+services:
+  mufinances:
+    build: .
+    container_name: mufinances
+    ports:
+      - "3200:3200"
+    environment:
+      CAMPUS_FPM_DB_BACKEND: sqlite
+      CAMPUS_FPM_DB_PATH: /app/data/campus_fpm.db
+      CAMPUS_FPM_DB_POOL_SIZE: "5"
+      CAMPUS_FPM_DB_SSL_MODE: prefer
+      CAMPUS_FPM_POSTGRES_DSN: ""
+      CAMPUS_FPM_SESSION_HOURS: "12"
+      CAMPUS_FPM_FIELD_KEY_FILE: /run/secrets/mufinances_field_key
+    volumes:
+      - ./data:/app/data
+    secrets:
+      - mufinances_field_key
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_DB: mufinances
+      POSTGRES_USER: mufinances
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+
+secrets:
+  mufinances_field_key:
+    file: ./deploy/secrets/mufinances_field_key.txt
+  postgres_password:
+    file: ./deploy/secrets/postgres_password.txt

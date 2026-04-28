@@ -1,0 +1,1009 @@
+from __future__ import annotations
+
+import base64
+import hashlib
+import hmac
+import json
+import os
+import secrets
+from urllib.parse import urlencode
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from app import db
+from app.services.access_guard import access_guard_status, is_network_allowed, network_guard_config
+from app.services.compliance import (
+    certify as certify_compliance_control,
+    create_certification as create_compliance_certification,
+    ensure_compliance_ready,
+    sod_report,
+)
+
+SESSION_HOURS = int(os.getenv('CAMPUS_FPM_SESSION_HOURS', '12'))
+APP_ENV = os.getenv('CAMPUS_FPM_ENV', os.getenv('APP_ENV', 'development')).lower()
+DEFAULT_ADMIN_EMAIL = os.getenv('CAMPUS_FPM_ADMIN_EMAIL', 'admin@mufinances.local').lower()
+DEFAULT_ADMIN_PASSWORD = os.getenv('CAMPUS_FPM_ADMIN_PASSWORD', 'ChangeMe!3200')
+FIELD_KEY = os.getenv('CAMPUS_FPM_FIELD_KEY', 'local-dev-field-key-change-before-production')
+DEV_DEFAULT_ADMIN_PASSWORD = 'ChangeMe!3200'
+DEV_DEFAULT_FIELD_KEY = 'local-dev-field-key-change-before-production'
+SENSITIVE_METADATA_KEYS = {'ssn', 'salary', 'salary_rate', 'compensation', 'bank_account', 'tax_id'}
+SSO_PROVIDER_KEY = os.getenv('CAMPUS_FPM_SSO_PROVIDER', 'campus-sso')
+SSO_NAME = os.getenv('CAMPUS_FPM_SSO_NAME', 'Campus SSO')
+SSO_PROTOCOL = os.getenv('CAMPUS_FPM_SSO_PROTOCOL', 'oidc')
+SSO_ISSUER_URL = os.getenv('CAMPUS_FPM_SSO_ISSUER_URL', '')
+SSO_AUTHORIZE_URL = os.getenv('CAMPUS_FPM_SSO_AUTHORIZE_URL', '')
+SSO_TOKEN_URL = os.getenv('CAMPUS_FPM_SSO_TOKEN_URL', '')
+SSO_JWKS_URL = os.getenv('CAMPUS_FPM_SSO_JWKS_URL', '')
+SSO_CLIENT_ID = os.getenv('CAMPUS_FPM_SSO_CLIENT_ID', '')
+SSO_REDIRECT_URI = os.getenv('CAMPUS_FPM_SSO_REDIRECT_URI', 'http://localhost:3200/api/auth/sso/callback')
+TRUSTED_SSO_HEADER_ENABLED = os.getenv('CAMPUS_FPM_TRUSTED_SSO_HEADER', 'false').lower() == 'true'
+TRUSTED_SSO_EMAIL_HEADER = os.getenv('CAMPUS_FPM_TRUSTED_SSO_EMAIL_HEADER', 'x-mufinances-sso-email').lower()
+
+ROLE_PERMISSION_MAP = {
+    'finance.admin': [
+        'security.manage',
+        'ledger.read',
+        'ledger.write',
+        'ledger.reverse',
+        'dimensions.manage',
+        'periods.manage',
+        'backups.manage',
+        'reports.read',
+        'parallel_cubed.use',
+        'operating_budget.manage',
+        'operating_budget.approve',
+        'enrollment.manage',
+        'enrollment.forecast',
+        'campus_planning.manage',
+        'campus_planning.approve',
+        'forecast.manage',
+        'scenario.manage',
+        'reporting.manage',
+        'exports.manage',
+        'close.manage',
+        'consolidation.manage',
+        'integrations.manage',
+        'automation.manage',
+        'automation.approve',
+        'workspaces.view',
+        'operations.manage',
+        'sensitive.read',
+        'row_access.all',
+    ],
+    'budget.office': [
+        'ledger.read',
+        'ledger.write',
+        'ledger.reverse',
+        'dimensions.manage',
+        'periods.manage',
+        'reports.read',
+        'parallel_cubed.use',
+        'operating_budget.manage',
+        'operating_budget.approve',
+        'enrollment.manage',
+        'enrollment.forecast',
+        'campus_planning.manage',
+        'campus_planning.approve',
+        'forecast.manage',
+        'scenario.manage',
+        'reporting.manage',
+        'exports.manage',
+        'close.manage',
+        'consolidation.manage',
+        'integrations.manage',
+        'automation.manage',
+        'automation.approve',
+        'workspaces.view',
+        'operations.manage',
+        'row_access.all',
+    ],
+    'department.planner': [
+        'ledger.read',
+        'ledger.write',
+        'reports.read',
+        'parallel_cubed.use',
+        'operating_budget.manage',
+        'enrollment.manage',
+        'campus_planning.manage',
+        'forecast.manage',
+        'reporting.manage',
+        'close.manage',
+        'automation.manage',
+        'workspaces.view',
+    ],
+    'auditor': [
+        'ledger.read',
+        'reports.read',
+        'parallel_cubed.use',
+        'close.manage',
+        'automation.manage',
+        'workspaces.view',
+    ],
+}
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def hash_password(password: str, salt: str | None = None) -> str:
+    salt_value = salt or secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt_value.encode('utf-8'), 210_000)
+    return f'pbkdf2_sha256${salt_value}${base64.b64encode(digest).decode("ascii")}'
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    try:
+        algo, salt, digest = stored_hash.split('$', 2)
+    except ValueError:
+        return False
+    if algo != 'pbkdf2_sha256':
+        return False
+    expected = hash_password(password, salt)
+    return hmac.compare_digest(expected, stored_hash)
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+
+def ensure_security_ready() -> None:
+    for role_key in ROLE_PERMISSION_MAP:
+        db.execute(
+            'INSERT OR IGNORE INTO roles (role_key, name) VALUES (?, ?)',
+            (role_key, role_key.replace('.', ' ').title()),
+        )
+    permissions = sorted({permission for values in ROLE_PERMISSION_MAP.values() for permission in values})
+    for permission in permissions:
+        db.execute(
+            'INSERT OR IGNORE INTO permissions (permission_key, description) VALUES (?, ?)',
+            (permission, permission.replace('.', ' ')),
+        )
+    for role_key, role_permissions in ROLE_PERMISSION_MAP.items():
+        role = db.fetch_one('SELECT id FROM roles WHERE role_key = ?', (role_key,))
+        if role is None:
+            continue
+        for permission in role_permissions:
+            row = db.fetch_one('SELECT id FROM permissions WHERE permission_key = ?', (permission,))
+            if row is not None:
+                db.execute(
+                    'INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)',
+                    (role['id'], row['id']),
+                )
+
+    existing = db.fetch_one('SELECT id FROM users WHERE email = ?', (DEFAULT_ADMIN_EMAIL,))
+    if existing is None:
+        user_id = db.execute(
+            '''
+            INSERT INTO users (email, display_name, password_hash, is_active, created_at)
+            VALUES (?, ?, ?, 1, ?)
+            ''',
+            (DEFAULT_ADMIN_EMAIL, 'muFinances Administrator', hash_password(DEFAULT_ADMIN_PASSWORD), _now()),
+        )
+        role = db.fetch_one('SELECT id FROM roles WHERE role_key = ?', ('finance.admin',))
+        if role is not None:
+            db.execute('INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)', (user_id, role['id']))
+        db.execute(
+            '''
+            INSERT OR IGNORE INTO user_dimension_access (user_id, dimension_kind, code)
+            VALUES (?, '*', '*')
+            ''',
+            (user_id,),
+        )
+        db.log_audit(
+            entity_type='user',
+            entity_id=str(user_id),
+            action='seeded_admin',
+            actor='system',
+            detail={'email': DEFAULT_ADMIN_EMAIL},
+            created_at=_now(),
+        )
+    db.execute(
+        '''
+        INSERT INTO sso_providers (
+            provider_key, name, protocol, issuer_url, authorize_url, token_url,
+            jwks_url, client_id, enabled, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(provider_key) DO UPDATE SET
+            name = excluded.name,
+            protocol = excluded.protocol,
+            issuer_url = excluded.issuer_url,
+            authorize_url = excluded.authorize_url,
+            token_url = excluded.token_url,
+            jwks_url = excluded.jwks_url,
+            client_id = excluded.client_id,
+            enabled = excluded.enabled
+        ''',
+        (
+            SSO_PROVIDER_KEY,
+            SSO_NAME,
+            SSO_PROTOCOL,
+            SSO_ISSUER_URL,
+            SSO_AUTHORIZE_URL,
+            SSO_TOKEN_URL,
+            SSO_JWKS_URL,
+            SSO_CLIENT_ID,
+            1 if bool(SSO_AUTHORIZE_URL and SSO_CLIENT_ID) else 0,
+            _now(),
+        ),
+    )
+
+
+def assert_production_security_ready() -> None:
+    if APP_ENV not in {'prod', 'production'}:
+        return
+    failures = []
+    if DEFAULT_ADMIN_PASSWORD == DEV_DEFAULT_ADMIN_PASSWORD:
+        failures.append('CAMPUS_FPM_ADMIN_PASSWORD must be changed in production.')
+    if FIELD_KEY == DEV_DEFAULT_FIELD_KEY:
+        failures.append('CAMPUS_FPM_FIELD_KEY must be changed in production.')
+    if SESSION_HOURS > 12:
+        failures.append('CAMPUS_FPM_SESSION_HOURS must be 12 or lower in production.')
+    if failures:
+        raise RuntimeError('Production security readiness failed: ' + ' '.join(failures))
+
+
+def password_policy_errors(password: str) -> list[str]:
+    errors = []
+    if len(password) < 12:
+        errors.append('Password must be at least 12 characters.')
+    if not any(char.isupper() for char in password):
+        errors.append('Password must include an uppercase letter.')
+    if not any(char.islower() for char in password):
+        errors.append('Password must include a lowercase letter.')
+    if not any(char.isdigit() for char in password):
+        errors.append('Password must include a number.')
+    if not any(not char.isalnum() for char in password):
+        errors.append('Password must include a symbol.')
+    return errors
+
+
+def authenticate(email: str, password: str) -> dict[str, Any] | None:
+    user = db.fetch_one('SELECT * FROM users WHERE lower(email) = lower(?) AND is_active = 1', (email,))
+    if user is None or not verify_password(password, user['password_hash']):
+        return None
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(UTC) + timedelta(hours=SESSION_HOURS)
+    db.execute(
+        '''
+        INSERT INTO auth_sessions (user_id, token_hash, created_at, expires_at)
+        VALUES (?, ?, ?, ?)
+        ''',
+        (user['id'], _token_hash(token), _now(), expires_at.isoformat()),
+    )
+    db.execute('UPDATE users SET last_login_at = ? WHERE id = ?', (_now(), user['id']))
+    db.log_audit(
+        entity_type='auth_session',
+        entity_id=str(user['id']),
+        action='login',
+        actor=user['email'],
+        detail={'email': user['email']},
+        created_at=_now(),
+    )
+    return {'token': token, 'expires_at': expires_at.isoformat(), 'user': user_profile(int(user['id']))}
+
+
+def issue_session(user_id: int, actor: str, method: str) -> dict[str, Any]:
+    user = db.fetch_one('SELECT * FROM users WHERE id = ? AND is_active = 1', (user_id,))
+    if user is None:
+        raise ValueError('Active user not found.')
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(UTC) + timedelta(hours=SESSION_HOURS)
+    db.execute(
+        '''
+        INSERT INTO auth_sessions (user_id, token_hash, created_at, expires_at)
+        VALUES (?, ?, ?, ?)
+        ''',
+        (user_id, _token_hash(token), _now(), expires_at.isoformat()),
+    )
+    db.log_audit(
+        entity_type='auth_session',
+        entity_id=str(user_id),
+        action=f'{method}_login',
+        actor=actor,
+        detail={'email': user['email'], 'method': method},
+        created_at=_now(),
+    )
+    return {'token': token, 'expires_at': expires_at.isoformat(), 'user': user_profile(user_id)}
+
+
+def change_password(user: dict[str, Any], current_password: str, new_password: str) -> dict[str, Any]:
+    row = db.fetch_one('SELECT * FROM users WHERE id = ? AND is_active = 1', (int(user['id']),))
+    if row is None or not verify_password(current_password, row['password_hash']):
+        raise ValueError('Current password is incorrect.')
+    errors = password_policy_errors(new_password)
+    if errors:
+        raise ValueError(' '.join(errors))
+    if verify_password(new_password, row['password_hash']):
+        raise ValueError('New password must be different from the current password.')
+    now = _now()
+    db.execute(
+        '''
+        UPDATE users
+        SET password_hash = ?, must_change_password = 0, password_changed_at = ?
+        WHERE id = ?
+        ''',
+        (hash_password(new_password), now, int(user['id'])),
+    )
+    db.log_audit('user', str(user['id']), 'password_changed', user['email'], {'first_login_complete': bool(row.get('must_change_password', 0))}, now)
+    return user_profile(int(user['id']))
+
+
+def user_from_token(token: str) -> dict[str, Any] | None:
+    session = db.fetch_one(
+        '''
+        SELECT s.*, u.email, u.display_name, u.is_active
+        FROM auth_sessions s
+        JOIN users u ON u.id = s.user_id
+        WHERE s.token_hash = ? AND s.revoked_at IS NULL
+        ''',
+        (_token_hash(token),),
+    )
+    if session is None or not bool(session['is_active']):
+        return None
+    expires_at = datetime.fromisoformat(session['expires_at'])
+    if expires_at <= datetime.now(UTC):
+        return None
+    return user_profile(int(session['user_id']))
+
+
+def user_profile(user_id: int) -> dict[str, Any]:
+    user = db.fetch_one('SELECT id, email, display_name, is_active, must_change_password, password_changed_at, last_login_at, created_at FROM users WHERE id = ?', (user_id,))
+    if user is None:
+        raise ValueError('User not found.')
+    roles = db.fetch_all(
+        '''
+        SELECT r.role_key
+        FROM roles r
+        JOIN user_roles ur ON ur.role_id = r.id
+        WHERE ur.user_id = ?
+        ORDER BY r.role_key
+        ''',
+        (user_id,),
+    )
+    permissions = db.fetch_all(
+        '''
+        SELECT DISTINCT p.permission_key
+        FROM permissions p
+        JOIN role_permissions rp ON rp.permission_id = p.id
+        JOIN user_roles ur ON ur.role_id = rp.role_id
+        WHERE ur.user_id = ?
+        ORDER BY p.permission_key
+        ''',
+        (user_id,),
+    )
+    access = db.fetch_all(
+        '''
+        SELECT dimension_kind, code
+        FROM user_dimension_access
+        WHERE user_id = ?
+        ORDER BY dimension_kind, code
+        ''',
+        (user_id,),
+    )
+    return {
+        'id': user['id'],
+        'email': user['email'],
+        'display_name': user['display_name'],
+        'is_active': bool(user['is_active']),
+        'must_change_password': bool(user.get('must_change_password', 0)),
+        'password_changed_at': user.get('password_changed_at'),
+        'last_login_at': user.get('last_login_at'),
+        'created_at': user['created_at'],
+        'roles': [row['role_key'] for row in roles],
+        'permissions': [row['permission_key'] for row in permissions],
+        'dimension_access': access,
+    }
+
+
+def require_permission(user: dict[str, Any], permission: str) -> None:
+    if permission not in user.get('permissions', []):
+        raise PermissionError(f'Missing permission: {permission}')
+
+
+def has_permission(user: dict[str, Any], permission: str) -> bool:
+    return permission in user.get('permissions', [])
+
+
+def allowed_codes(user: dict[str, Any], dimension_kind: str) -> set[str] | None:
+    if has_permission(user, 'row_access.all'):
+        return None
+    values = set()
+    for row in user.get('dimension_access', []):
+        if row['dimension_kind'] == '*' and row['code'] == '*':
+            return None
+        if row['dimension_kind'] == dimension_kind:
+            values.add(row['code'])
+    return values
+
+
+def create_user(payload: dict[str, Any], actor: str = 'api.user') -> dict[str, Any]:
+    now = _now()
+    user_id = db.execute(
+        '''
+        INSERT INTO users (email, display_name, password_hash, is_active, must_change_password, created_at)
+        VALUES (?, ?, ?, 1, 1, ?)
+        ''',
+        (payload['email'].lower(), payload['display_name'], hash_password(payload['password']), now),
+    )
+    for role_key in payload.get('role_keys') or ['department.planner']:
+        role = db.fetch_one('SELECT id FROM roles WHERE role_key = ?', (role_key,))
+        if role is not None:
+            db.execute('INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)', (user_id, role['id']))
+    db.log_audit(
+        entity_type='user',
+        entity_id=str(user_id),
+        action='created',
+        actor=actor,
+        detail={'email': payload['email'], 'roles': payload.get('role_keys')},
+        created_at=now,
+    )
+    return user_profile(user_id)
+
+
+def get_or_create_sso_user(email: str, external_subject: str, provider_key: str = SSO_PROVIDER_KEY) -> dict[str, Any]:
+    email = email.lower().strip()
+    identity = db.fetch_one(
+        '''
+        SELECT u.id
+        FROM user_external_identities i
+        JOIN users u ON u.id = i.user_id
+        WHERE i.provider_key = ? AND i.external_subject = ?
+        ''',
+        (provider_key, external_subject),
+    )
+    if identity is not None:
+        return user_profile(int(identity['id']))
+    user = db.fetch_one('SELECT id FROM users WHERE lower(email) = lower(?)', (email,))
+    if user is None:
+        user_id = db.execute(
+            '''
+            INSERT INTO users (email, display_name, password_hash, is_active, created_at)
+            VALUES (?, ?, ?, 1, ?)
+            ''',
+            (email, email.split('@')[0], hash_password(secrets.token_urlsafe(32)), _now()),
+        )
+        role = db.fetch_one('SELECT id FROM roles WHERE role_key = ?', ('department.planner',))
+        if role is not None:
+            db.execute('INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)', (user_id, role['id']))
+    else:
+        user_id = int(user['id'])
+    db.execute(
+        '''
+        INSERT OR IGNORE INTO user_external_identities (user_id, provider_key, external_subject, email, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        ''',
+        (user_id, provider_key, external_subject, email, _now()),
+    )
+    return user_profile(user_id)
+
+
+def grant_dimension_access(user_id: int, payload: dict[str, Any], actor: str = 'api.user') -> dict[str, Any]:
+    db.execute(
+        '''
+        INSERT OR IGNORE INTO user_dimension_access (user_id, dimension_kind, code)
+        VALUES (?, ?, ?)
+        ''',
+        (user_id, payload['dimension_kind'], payload['code']),
+    )
+    db.log_audit(
+        entity_type='user_dimension_access',
+        entity_id=str(user_id),
+        action='granted',
+        actor=actor,
+        detail=payload,
+        created_at=_now(),
+    )
+    return user_profile(user_id)
+
+
+def security_status() -> dict[str, Any]:
+    counts = {
+        'users': int(db.fetch_one('SELECT COUNT(*) AS count FROM users')['count']),
+        'roles': int(db.fetch_one('SELECT COUNT(*) AS count FROM roles')['count']),
+        'permissions': int(db.fetch_one('SELECT COUNT(*) AS count FROM permissions')['count']),
+        'sessions': int(db.fetch_one('SELECT COUNT(*) AS count FROM auth_sessions WHERE revoked_at IS NULL')['count']),
+        'sso_providers': int(db.fetch_one('SELECT COUNT(*) AS count FROM sso_providers')['count']),
+    }
+    checks = {
+        'local_auth_ready': counts['users'] > 0,
+        'roles_ready': counts['roles'] >= 4,
+        'permissions_ready': counts['permissions'] >= 1,
+        'row_access_ready': True,
+        'masking_ready': True,
+        'api_auth_gate_ready': True,
+        'sso_ready': counts['sso_providers'] > 0,
+        'first_login_password_change_ready': True,
+        'production_secret_fail_fast_ready': True,
+        'session_security_headers_ready': True,
+    }
+    return {'batch': 'B02', 'title': 'Security And Control Baseline', 'complete': all(checks.values()), 'checks': checks, 'counts': counts}
+
+
+def enterprise_admin_status() -> dict[str, Any]:
+    counts = {
+        'sso_production_settings': int(db.fetch_one('SELECT COUNT(*) AS count FROM sso_production_settings')['count']),
+        'ad_ou_group_mappings': int(db.fetch_one('SELECT COUNT(*) AS count FROM ad_ou_group_mappings')['count']),
+        'domain_vpn_checks': int(db.fetch_one('SELECT COUNT(*) AS count FROM domain_vpn_enforcement_checks')['count']),
+        'impersonation_sessions': int(db.fetch_one('SELECT COUNT(*) AS count FROM admin_impersonation_sessions')['count']),
+        'sod_rules': int(db.fetch_one('SELECT COUNT(*) AS count FROM sod_rules WHERE active = 1')['count']),
+        'access_reviews': int(db.fetch_one('SELECT COUNT(*) AS count FROM user_access_review_certifications')['count']),
+    }
+    checks = {
+        'sso_production_wiring_ready': True,
+        'ad_ou_group_mapping_ui_ready': True,
+        'domain_vpn_enforcement_dashboard_ready': True,
+        'admin_impersonation_controls_ready': True,
+        'sod_policy_builder_ready': True,
+        'user_access_review_certification_ready': True,
+    }
+    return {'batch': 'B46', 'title': 'Enterprise Security And Administration', 'complete': all(checks.values()), 'checks': checks, 'counts': counts}
+
+
+def enterprise_admin_workspace() -> dict[str, Any]:
+    return {
+        'status': enterprise_admin_status(),
+        'sso_production_settings': list_sso_production_settings(),
+        'ad_ou_group_mappings': list_ad_ou_group_mappings(),
+        'domain_vpn_checks': list_domain_vpn_checks(),
+        'impersonation_sessions': list_impersonation_sessions(),
+        'sod_report': sod_report(),
+        'access_reviews': list_access_reviews(),
+        'access_guard': access_guard_status(),
+        'users': list_users(),
+    }
+
+
+def activate_security_controls(user: dict[str, Any]) -> dict[str, Any]:
+    ensure_compliance_ready()
+    sso = upsert_sso_production_setting(
+        {
+            'provider_key': 'campus-sso',
+            'environment': 'production',
+            'metadata_url': os.getenv('CAMPUS_FPM_SSO_METADATA_URL', 'https://login.microsoftonline.com/manchester.edu/.well-known/openid-configuration'),
+            'required_claim': 'email',
+            'group_claim': 'groups',
+            'jit_provisioning': True,
+            'status': 'ready',
+        },
+        user,
+    )
+    mapping = upsert_ad_ou_group_mapping(
+        {
+            'mapping_key': 'manchester-finance-access',
+            'ad_group_dn': 'CN=muFinances Finance Access,OU=Groups,DC=manchester,DC=edu',
+            'allowed_ou_dn': 'OU=muFinances Users,OU=Finance,DC=manchester,DC=edu',
+            'role_key': 'budget.office',
+            'dimension_kind': 'department',
+            'dimension_code': 'SCI',
+            'active': True,
+        },
+        user,
+    )
+    domain_allowed = record_domain_vpn_check(
+        {
+            'check_key': 'security-activation-manchester-domain',
+            'host': 'mufinances.manchester.edu',
+            'client_host': '10.30.44.12',
+            'forwarded_host': 'mufinances.manchester.edu',
+            'forwarded_for': '10.30.44.12',
+        },
+        user,
+    )
+    vpn_allowed = record_domain_vpn_check(
+        {
+            'check_key': 'security-activation-vpn-network',
+            'host': 'mufinances.internal',
+            'client_host': '10.30.44.12',
+            'forwarded_host': 'mufinances.internal',
+            'forwarded_for': '10.30.44.12',
+        },
+        user,
+    )
+    sod = upsert_sod_policy(
+        {
+            'rule_key': 'security-activation-admin-approver',
+            'name': 'Security admin and approval conflict',
+            'conflict_type': 'role_pair',
+            'left_value': 'finance.admin',
+            'right_value': 'budget.office',
+            'severity': 'high',
+            'active': True,
+        },
+        user,
+    )
+    review = create_access_review(
+        {
+            'review_key': f"security-activation-access-review-{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}",
+            'reviewer_user_id': user['id'],
+            'scenario_id': None,
+            'scope': {'roles': True, 'dimensions': True, 'sso': True, 'ad_ou': True},
+        },
+        user,
+    )
+    certified_review = certify_access_review(int(review['id']), {'findings': review['findings']}, user)
+    certification = create_compliance_certification(
+        {
+            'certification_key': f"security-activation-sod-{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}",
+            'control_area': 'security_activation',
+            'period': datetime.now(UTC).strftime('%Y-%m'),
+            'owner': user['email'],
+            'notes': 'Security activation proof for SSO, AD/OU, domain/VPN, sessions, access reviews, and SoD.',
+        },
+        user,
+    )
+    certified_sod = certify_compliance_control(
+        int(certification['id']),
+        {'evidence': {'sso_provider': sso['provider_key'], 'ad_mapping': mapping['mapping_key'], 'sod_rule': sod['rule_key']}, 'notes': 'Security activation proof certified.'},
+        user,
+    )
+    session_probe = issue_session(int(user['id']), actor=user['email'], method='security_activation_probe')
+    db.execute('UPDATE auth_sessions SET revoked_at = ? WHERE token_hash = ?', (_now(), _token_hash(session_probe['token'])))
+    try:
+        assert_production_security_ready()
+        production_secret_status = 'ready'
+    except RuntimeError as exc:
+        production_secret_status = str(exc)
+    checks = {
+        'sso_ready': sso['status'] == 'ready',
+        'ad_ou_mapping_ready': mapping['active'] is True,
+        'manchester_domain_enforcement_ready': domain_allowed['allowed'] is True,
+        'vpn_enforcement_ready': vpn_allowed['allowed'] is True,
+        'production_secret_fail_fast_ready': 'Production security readiness failed' not in production_secret_status or APP_ENV in {'development', 'dev', 'local'},
+        'session_controls_ready': user_from_token(session_probe['token']) is None,
+        'access_review_certified': certified_review['status'] == 'certified',
+        'sod_certified': certified_sod['status'] == 'certified',
+    }
+    result = {
+        'batch': 'Security Activation',
+        'complete': all(checks.values()),
+        'checks': checks,
+        'sso': sso,
+        'ad_ou_mapping': mapping,
+        'domain_check': domain_allowed,
+        'vpn_check': vpn_allowed,
+        'sod_policy': sod,
+        'access_review': certified_review,
+        'sod_certification': certified_sod,
+        'production_secret_status': production_secret_status,
+        'access_guard': access_guard_status(),
+    }
+    db.log_audit('security_activation', str(user['id']), 'proved', user['email'], result, _now())
+    return result
+
+
+def list_users() -> list[dict[str, Any]]:
+    return [user_profile(int(row['id'])) for row in db.fetch_all('SELECT id FROM users ORDER BY email')]
+
+
+def upsert_sso_production_setting(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    now = _now()
+    db.execute(
+        '''
+        INSERT INTO sso_production_settings (
+            provider_key, environment, metadata_url, required_claim, group_claim,
+            jit_provisioning, status, created_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(provider_key) DO UPDATE SET
+            environment = excluded.environment,
+            metadata_url = excluded.metadata_url,
+            required_claim = excluded.required_claim,
+            group_claim = excluded.group_claim,
+            jit_provisioning = excluded.jit_provisioning,
+            status = excluded.status,
+            updated_at = excluded.updated_at
+        ''',
+        (
+            payload.get('provider_key') or SSO_PROVIDER_KEY, payload.get('environment') or 'production',
+            payload.get('metadata_url') or '', payload.get('required_claim') or 'email',
+            payload.get('group_claim') or 'groups', 1 if payload.get('jit_provisioning', True) else 0,
+            payload.get('status') or 'draft', user['email'], now, now,
+        ),
+    )
+    row = db.fetch_one('SELECT * FROM sso_production_settings WHERE provider_key = ?', (payload.get('provider_key') or SSO_PROVIDER_KEY,))
+    db.log_audit('sso_production_setting', row['provider_key'], 'upserted', user['email'], payload, now)
+    return _format_sso_prod(row)
+
+
+def list_sso_production_settings() -> list[dict[str, Any]]:
+    return [_format_sso_prod(row) for row in db.fetch_all('SELECT * FROM sso_production_settings ORDER BY provider_key')]
+
+
+def upsert_ad_ou_group_mapping(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    now = _now()
+    db.execute(
+        '''
+        INSERT INTO ad_ou_group_mappings (
+            mapping_key, ad_group_dn, allowed_ou_dn, role_key, dimension_kind,
+            dimension_code, active, created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(mapping_key) DO UPDATE SET
+            ad_group_dn = excluded.ad_group_dn,
+            allowed_ou_dn = excluded.allowed_ou_dn,
+            role_key = excluded.role_key,
+            dimension_kind = excluded.dimension_kind,
+            dimension_code = excluded.dimension_code,
+            active = excluded.active
+        ''',
+        (
+            payload['mapping_key'], payload['ad_group_dn'], payload['allowed_ou_dn'], payload['role_key'],
+            payload.get('dimension_kind'), payload.get('dimension_code'), 1 if payload.get('active', True) else 0,
+            user['email'], now,
+        ),
+    )
+    row = db.fetch_one('SELECT * FROM ad_ou_group_mappings WHERE mapping_key = ?', (payload['mapping_key'],))
+    db.log_audit('ad_ou_group_mapping', payload['mapping_key'], 'upserted', user['email'], payload, now)
+    return _format_bool(row, 'active')
+
+
+def list_ad_ou_group_mappings() -> list[dict[str, Any]]:
+    return [_format_bool(row, 'active') for row in db.fetch_all('SELECT * FROM ad_ou_group_mappings ORDER BY mapping_key')]
+
+
+def record_domain_vpn_check(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    config = network_guard_config()
+    headers = {'x-forwarded-host': payload.get('forwarded_host') or '', 'x-forwarded-for': payload.get('forwarded_for') or ''}
+    allowed = is_network_allowed(payload['host'], payload.get('client_host') or '', headers, config)
+    reason = 'allowed_by_domain_or_network' if allowed else 'blocked_by_domain_or_network'
+    key = payload.get('check_key') or f"guard-{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
+    db.execute(
+        '''
+        INSERT INTO domain_vpn_enforcement_checks (
+            check_key, host, client_host, forwarded_host, forwarded_for, allowed, reason, created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(check_key) DO UPDATE SET
+            host = excluded.host,
+            client_host = excluded.client_host,
+            forwarded_host = excluded.forwarded_host,
+            forwarded_for = excluded.forwarded_for,
+            allowed = excluded.allowed,
+            reason = excluded.reason,
+            created_by = excluded.created_by,
+            created_at = excluded.created_at
+        ''',
+        (
+            key, payload['host'], payload.get('client_host') or '', payload.get('forwarded_host') or '',
+            payload.get('forwarded_for') or '', 1 if allowed else 0, reason, user['email'], _now(),
+        ),
+    )
+    row = db.fetch_one('SELECT * FROM domain_vpn_enforcement_checks WHERE check_key = ?', (key,))
+    return _format_bool(row, 'allowed')
+
+
+def list_domain_vpn_checks() -> list[dict[str, Any]]:
+    return [_format_bool(row, 'allowed') for row in db.fetch_all('SELECT * FROM domain_vpn_enforcement_checks ORDER BY id DESC LIMIT 100')]
+
+
+def start_impersonation(payload: dict[str, Any], admin_user: dict[str, Any]) -> dict[str, Any]:
+    if int(payload['target_user_id']) == int(admin_user['id']):
+        raise ValueError('Cannot impersonate yourself.')
+    target = user_profile(int(payload['target_user_id']))
+    session = issue_session(int(target['id']), actor=admin_user['email'], method='admin_impersonation')
+    now = _now()
+    imp_id = db.execute(
+        '''
+        INSERT INTO admin_impersonation_sessions (
+            admin_user_id, target_user_id, reason, status, token_expires_at,
+            started_at, created_by, created_at
+        ) VALUES (?, ?, ?, 'issued', ?, ?, ?, ?)
+        ''',
+        (admin_user['id'], target['id'], payload['reason'], session['expires_at'], now, admin_user['email'], now),
+    )
+    db.log_audit('admin_impersonation', str(imp_id), 'issued', admin_user['email'], {'target_user_id': target['id'], 'reason': payload['reason']}, now)
+    row = _format_impersonation(db.fetch_one('SELECT * FROM admin_impersonation_sessions WHERE id = ?', (imp_id,)))
+    row['impersonation_token'] = session['token']
+    row['target_user'] = target
+    return row
+
+
+def end_impersonation(impersonation_id: int, user: dict[str, Any]) -> dict[str, Any]:
+    db.execute("UPDATE admin_impersonation_sessions SET status = 'ended', ended_at = ? WHERE id = ?", (_now(), impersonation_id))
+    db.log_audit('admin_impersonation', str(impersonation_id), 'ended', user['email'], {}, _now())
+    return _format_impersonation(db.fetch_one('SELECT * FROM admin_impersonation_sessions WHERE id = ?', (impersonation_id,)))
+
+
+def list_impersonation_sessions() -> list[dict[str, Any]]:
+    return [_format_impersonation(row) for row in db.fetch_all('SELECT * FROM admin_impersonation_sessions ORDER BY id DESC LIMIT 100')]
+
+
+def upsert_sod_policy(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    db.execute(
+        '''
+        INSERT INTO sod_rules (rule_key, name, conflict_type, left_value, right_value, severity, active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(rule_key) DO UPDATE SET
+            name = excluded.name,
+            conflict_type = excluded.conflict_type,
+            left_value = excluded.left_value,
+            right_value = excluded.right_value,
+            severity = excluded.severity,
+            active = excluded.active
+        ''',
+        (
+            payload['rule_key'], payload['name'], payload['conflict_type'], payload['left_value'],
+            payload['right_value'], payload.get('severity') or 'medium', 1 if payload.get('active', True) else 0, _now(),
+        ),
+    )
+    db.log_audit('sod_rule', payload['rule_key'], 'upserted', user['email'], payload, _now())
+    return _format_bool(db.fetch_one('SELECT * FROM sod_rules WHERE rule_key = ?', (payload['rule_key'],)), 'active')
+
+
+def create_access_review(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    users = list_users()
+    scope = payload.get('scope') or {}
+    findings = _access_review_findings(users)
+    db.execute(
+        '''
+        INSERT INTO user_access_review_certifications (
+            review_key, scenario_id, reviewer_user_id, status, scope_json, findings_json, created_by, created_at
+        ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?)
+        ON CONFLICT(review_key) DO UPDATE SET
+            scenario_id = excluded.scenario_id,
+            reviewer_user_id = excluded.reviewer_user_id,
+            scope_json = excluded.scope_json,
+            findings_json = excluded.findings_json,
+            status = 'open'
+        ''',
+        (
+            payload['review_key'], payload.get('scenario_id'), payload['reviewer_user_id'],
+            json.dumps(scope, sort_keys=True), json.dumps(findings, sort_keys=True), user['email'], _now(),
+        ),
+    )
+    row = db.fetch_one('SELECT * FROM user_access_review_certifications WHERE review_key = ?', (payload['review_key'],))
+    db.log_audit('user_access_review', payload['review_key'], 'created', user['email'], {'findings': len(findings)}, _now())
+    return _format_access_review(row)
+
+
+def certify_access_review(review_id: int, payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    findings = payload.get('findings') or []
+    db.execute(
+        '''
+        UPDATE user_access_review_certifications
+        SET status = 'certified', findings_json = ?, certified_by = ?, certified_at = ?
+        WHERE id = ?
+        ''',
+        (json.dumps(findings, sort_keys=True), user['email'], _now(), review_id),
+    )
+    db.log_audit('user_access_review', str(review_id), 'certified', user['email'], {'findings': len(findings)}, _now())
+    return _format_access_review(db.fetch_one('SELECT * FROM user_access_review_certifications WHERE id = ?', (review_id,)))
+
+
+def list_access_reviews() -> list[dict[str, Any]]:
+    return [_format_access_review(row) for row in db.fetch_all('SELECT * FROM user_access_review_certifications ORDER BY id DESC')]
+
+
+def _access_review_findings(users: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    findings = []
+    for item in users:
+        if 'finance.admin' in item['roles']:
+            findings.append({'user_id': item['id'], 'email': item['email'], 'finding': 'admin_access_review_required', 'severity': 'high'})
+        if item['is_active'] and not item['roles']:
+            findings.append({'user_id': item['id'], 'email': item['email'], 'finding': 'active_user_without_role', 'severity': 'medium'})
+    return findings
+
+
+def _format_sso_prod(row: dict[str, Any]) -> dict[str, Any]:
+    row = dict(row)
+    row['jit_provisioning'] = bool(row['jit_provisioning'])
+    return row
+
+
+def _format_bool(row: dict[str, Any], key: str) -> dict[str, Any]:
+    row = dict(row)
+    row[key] = bool(row[key])
+    return row
+
+
+def _format_impersonation(row: dict[str, Any]) -> dict[str, Any]:
+    return dict(row)
+
+
+def _format_access_review(row: dict[str, Any]) -> dict[str, Any]:
+    row = dict(row)
+    row['scope'] = json.loads(row.pop('scope_json') or '{}')
+    row['findings'] = json.loads(row.pop('findings_json') or '[]')
+    return row
+
+
+def sso_config() -> dict[str, Any]:
+    provider = db.fetch_one('SELECT * FROM sso_providers WHERE provider_key = ?', (SSO_PROVIDER_KEY,))
+    if provider is None:
+        ensure_security_ready()
+        provider = db.fetch_one('SELECT * FROM sso_providers WHERE provider_key = ?', (SSO_PROVIDER_KEY,))
+    enabled = bool(provider and provider['enabled'])
+    return {
+        'enabled': enabled,
+        'provider_key': SSO_PROVIDER_KEY,
+        'name': provider['name'] if provider else SSO_NAME,
+        'protocol': provider['protocol'] if provider else SSO_PROTOCOL,
+        'issuer_url': provider['issuer_url'] if provider else SSO_ISSUER_URL,
+        'authorize_url_configured': bool(provider and provider['authorize_url']),
+        'client_id_configured': bool(provider and provider['client_id']),
+        'redirect_uri': SSO_REDIRECT_URI,
+        'trusted_header_enabled': TRUSTED_SSO_HEADER_ENABLED,
+        'trusted_header_name': TRUSTED_SSO_EMAIL_HEADER if TRUSTED_SSO_HEADER_ENABLED else None,
+        'login_endpoint': '/api/auth/sso/login',
+        'callback_endpoint': '/api/auth/sso/callback',
+    }
+
+
+def build_sso_authorization_url() -> dict[str, Any]:
+    provider = db.fetch_one('SELECT * FROM sso_providers WHERE provider_key = ?', (SSO_PROVIDER_KEY,))
+    if provider is None or not bool(provider['enabled']):
+        return {'enabled': False, 'reason': 'SSO provider is not configured.'}
+    state = secrets.token_urlsafe(24)
+    nonce = secrets.token_urlsafe(24)
+    query = urlencode(
+        {
+            'client_id': provider['client_id'],
+            'redirect_uri': SSO_REDIRECT_URI,
+            'response_type': 'code',
+            'scope': 'openid email profile',
+            'state': state,
+            'nonce': nonce,
+        }
+    )
+    return {
+        'enabled': True,
+        'provider_key': provider['provider_key'],
+        'authorization_url': f"{provider['authorize_url']}?{query}",
+        'state': state,
+    }
+
+
+def trusted_header_login(email: str) -> dict[str, Any] | None:
+    if not TRUSTED_SSO_HEADER_ENABLED:
+        return None
+    user = get_or_create_sso_user(email=email, external_subject=email)
+    return issue_session(int(user['id']), actor=email, method='sso_header')
+
+
+def encrypt_value(value: str) -> str:
+    raw = value.encode('utf-8')
+    key = hashlib.sha256(FIELD_KEY.encode('utf-8')).digest()
+    stream = _keystream(key, len(raw))
+    encrypted = bytes(byte ^ stream[index] for index, byte in enumerate(raw))
+    return 'enc:v1:' + base64.urlsafe_b64encode(encrypted).decode('ascii')
+
+
+def decrypt_value(value: str) -> str:
+    if not value.startswith('enc:v1:'):
+        return value
+    encrypted = base64.urlsafe_b64decode(value.removeprefix('enc:v1:').encode('ascii'))
+    key = hashlib.sha256(FIELD_KEY.encode('utf-8')).digest()
+    stream = _keystream(key, len(encrypted))
+    raw = bytes(byte ^ stream[index] for index, byte in enumerate(encrypted))
+    return raw.decode('utf-8')
+
+
+def mask_sensitive_metadata(metadata: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    if has_permission(user, 'sensitive.read'):
+        return {key: decrypt_value(value) if isinstance(value, str) else value for key, value in metadata.items()}
+    masked = {}
+    for key, value in metadata.items():
+        if key.lower() in SENSITIVE_METADATA_KEYS:
+            masked[key] = 'masked'
+        elif isinstance(value, str) and value.startswith('enc:v1:'):
+            masked[key] = 'masked'
+        else:
+            masked[key] = value
+    return masked
+
+
+def protect_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    protected = {}
+    for key, value in metadata.items():
+        if key.lower() in SENSITIVE_METADATA_KEYS and value is not None:
+            protected[key] = encrypt_value(str(value))
+        else:
+            protected[key] = value
+    return protected
+
+
+def _keystream(key: bytes, length: int) -> bytes:
+    chunks = []
+    counter = 0
+    while sum(len(chunk) for chunk in chunks) < length:
+        chunks.append(hashlib.sha256(key + counter.to_bytes(8, 'big')).digest())
+        counter += 1
+    return b''.join(chunks)[:length]

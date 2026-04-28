@@ -1,0 +1,1883 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>muFinances</title>
+  <link rel="stylesheet" href="/static/styles.css?v=20260428-chat-gap" />
+    <script src="/static/modules/registry.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#mainContent">Skip to main content</a>
+    <section id="authGate" class="auth-gate hidden" aria-labelledby="loginTitle">
+      <form id="loginForm" class="panel auth-panel" aria-describedby="loginHelp">
+        <p class="eyebrow">Secure session</p>
+        <h1 id="loginTitle">Sign in to muFinances</h1>
+        <p id="loginHelp" class="muted">Financial data is available only after authentication.</p>
+        <label>Username or email <input name="email" type="text" required autocomplete="username" /></label>
+        <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
+        <button class="primary" type="submit">Sign in</button>
+      </form>
+    </section>
+    <dialog id="passwordChangeDialog">
+      <form id="passwordChangeForm" method="dialog">
+        <h2>Change password</h2>
+        <p class="muted">This account must set a new password before opening financial workspaces.</p>
+        <label>Current credential <input name="current_password" type="password" required autocomplete="current-password" /></label>
+        <label>New credential <input name="new_password" type="password" required minlength="12" autocomplete="new-password" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Update password</button></menu>
+      </form>
+    </dialog>
+    <div id="appShell" class="shell hidden" data-layout-signature="mu-ledger-flow-console">
+      <aside class="sidebar command-deck" aria-label="muFinances navigation and controls">
+        <div class="deck-titlebar">
+          <div>
+            <p class="eyebrow">Flow console</p>
+            <strong>muFinances command deck</strong>
+          </div>
+          <button id="footerSignOutButton" class="deck-signout">Sign out</button>
+        </div>
+        <div id="commandDeckBody" class="command-deck-body">
+          <div class="brand-block">
+            <p class="eyebrow">Localhost:3200</p>
+            <h1>muFinances</h1>
+            <p class="muted">
+              Campus planning flows wired through Parallel Cubed, dimensional ledgers,
+              close controls, and governed operations.
+            </p>
+          </div>
+          <nav aria-label="Primary sections">
+            <a href="#overview">Overview</a>
+            <a href="#guidance-training">Guidance</a>
+            <a href="#workspaces">Workspaces</a>
+            <a href="#productivity">Productivity</a>
+            <a href="#summary">Summary</a>
+            <a href="#ledger-depth">Ledger depth</a>
+            <a href="#operating-budget">Operating budget</a>
+            <a href="#enrollment">Enrollment</a>
+            <a href="#campus-planning">Campus planning</a>
+            <a href="#scenario-engine">Forecast engine</a>
+            <a href="#model-builder">Model builder</a>
+            <a href="#reporting">Reporting</a>
+            <a href="#close">Close</a>
+            <a href="#line-items">Budget lines</a>
+            <a href="#drivers">Drivers</a>
+            <a href="#workflow">Workflow</a>
+            <a href="#integrations">Integrations</a>
+            <a href="#automation">Automation</a>
+            <a href="#ai-explainability">AI explainability</a>
+            <a href="#operations">Operations</a>
+            <a href="#compliance">Compliance</a>
+            <a href="#evidence">Evidence</a>
+          </nav>
+          <section class="panel compact command-controls" aria-labelledby="scenarioControlsTitle">
+            <h2 id="scenarioControlsTitle">Scenario controls</h2>
+            <label for="scenarioSelect">Scenario</label>
+            <select id="scenarioSelect"></select>
+            <label for="periodSelect">Fiscal period</label>
+            <select id="periodSelect"></select>
+            <div id="profileSummary" class="muted" aria-live="polite"></div>
+            <span id="notificationCount" class="tag" aria-live="polite"></span>
+            <button id="forecastButton" class="primary">Run forecast</button>
+            <button id="refreshButton">Refresh</button>
+          </section>
+          <div class="deck-footer">
+            <button id="heroImportButton" class="primary">Import data</button>
+            <button id="heroExportButton">Export data</button>
+            <button id="marketWatchButton">Market Watch</button>
+            <button id="chatButton" type="button" aria-controls="chatSatellite" aria-expanded="false">Chat</button>
+            <button id="commandDeckToggle" class="deck-toggle" type="button" aria-expanded="true" aria-controls="commandDeckBody">Hide</button>
+          </div>
+        </div>
+      </aside>
+
+      <main id="mainContent" class="content" tabindex="-1">
+        <div id="appStatus" class="app-status" role="status" aria-live="polite" data-state="ready">Ready</div>
+        <section id="guidedStart" class="panel guided-start" aria-labelledby="guidedStartTitle">
+          <div>
+            <p class="eyebrow">Start here</p>
+            <h2 id="guidedStartTitle">What do you want to do first?</h2>
+            <p class="muted">No software knowledge needed. Pick the job, and muFinances will open the right workflow.</p>
+          </div>
+          <div class="guide-grid">
+            <button id="guidedManualButton" class="guide-card" type="button">
+              <strong>Enter data</strong>
+              <span>Add one budget or ledger line by department, account, period, and amount.</span>
+            </button>
+            <button id="guidedImportButton" class="guide-card" type="button">
+              <strong>Import data</strong>
+              <span>Paste CSV or tab-delimited exports from Prophix, ERP, SIS, HR, payroll, grants, or other systems.</span>
+            </button>
+            <button id="guidedExportButton" class="guide-card" type="button">
+              <strong>Export data</strong>
+              <span>Create a BI/export package from the active scenario.</span>
+            </button>
+          </div>
+        </section>
+
+        <section id="guidance-training" class="panel" aria-labelledby="guidanceTrainingTitle">
+          <div class="section-header">
+            <div>
+              <h2 id="guidanceTrainingTitle">Guidance and finance training</h2>
+              <p id="guidanceRoleSummary" class="muted"></p>
+            </div>
+            <div class="hero-actions">
+              <button id="completeGuidanceTaskButton">Complete next task</button>
+              <button id="startPlannerTrainingButton">Planner training</button>
+              <button id="startControllerTrainingButton">Controller training</button>
+              <button id="startAdminTrainingButton" class="primary">Admin training</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Guided task checklists</h3><div id="guidanceChecklistTable"></div></div>
+            <div><h3>Field help</h3><div id="fieldHelpTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Process walkthroughs</h3><div id="processWalkthroughTable"></div></div>
+            <div><h3>Campus planning playbooks</h3><div id="planningPlaybookTable"></div></div>
+          </div>
+          <div><h3>Training mode sessions</h3><div id="trainingSessionTable"></div></div>
+        </section>
+
+        <section id="officeInterop" class="panel" aria-labelledby="officeInteropTitle">
+          <div class="section-header office-header">
+            <h2 id="officeInteropTitle">Excel and Office interop</h2>
+            <div class="hero-actions">
+              <button id="createExcelTemplateButton" class="primary">Excel template</button>
+              <button id="refreshExcelWorkbookButton">Refresh</button>
+              <button id="publishExcelWorkbookButton">Publish</button>
+              <button id="importExcelRoundtripButton">Import edited workbook</button>
+              <button id="createWorkbookPackageButton">Workbook package</button>
+              <button id="refreshPowerPointButton">PowerPoint refresh</button>
+            </div>
+          </div>
+          <p class="muted office-note">Export an editable Excel template, import it back after edits, or generate a workbook package for sharing.</p>
+          <div class="grid two">
+            <div><h3>Office workbooks</h3><div id="officeWorkbookTable"></div></div>
+            <div><h3>Round-trip imports</h3><div id="officeImportTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Named ranges</h3><div id="officeNamedRangeTable"></div></div>
+            <div><h3>Cell comments</h3><div id="officeCellCommentTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Excel workspace actions</h3><div id="officeActionTable"></div></div>
+            <div>
+              <h3>Add cell note</h3>
+              <div class="inline-form">
+                <input id="officeCommentCellInput" aria-label="Excel cell reference" value="E2" />
+                <input id="officeCommentTextInput" aria-label="Excel cell comment" value="Review this budget variance" />
+                <button id="addOfficeCommentButton" type="button">Comment</button>
+              </div>
+            </div>
+          </div>
+          <p id="officeInteropMessage" class="muted" role="status" aria-live="polite"></p>
+        </section>
+
+
+        <section id="overview" class="hero panel ledger-banner" aria-labelledby="overviewTitle">
+          <div>
+            <p class="eyebrow">Flow console</p>
+            <h2 id="overviewTitle">Parallel Cubed ledger map</h2>
+            <p>
+              Follow the campus money path from source data to planning ledger,
+              review lanes, close evidence, and operating controls.
+            </p>
+          </div>
+          <div class="hero-actions">
+            <button id="newScenarioButton" class="primary">Create scenario</button>
+            <button id="addLineButton">Add line item</button>
+          </div>
+        </section>
+
+        <section id="workspaces" class="panel" aria-labelledby="workspacesTitle">
+          <div class="section-header">
+            <h2 id="workspacesTitle">Role workspaces</h2>
+            <span id="workspaceCount" class="tag"></span>
+          </div>
+          <div id="workspaceCards" class="grid two"></div>
+        </section>
+
+        <section id="productivity" class="panel" aria-labelledby="productivityTitle">
+          <div class="section-header">
+            <h2 id="productivityTitle">UX productivity</h2>
+            <div class="hero-actions">
+              <button id="saveProfileButton">Save profile</button>
+              <button id="validateGridButton">Validate grid</button>
+              <button id="bulkPasteButton" class="primary">Bulk paste</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Notification center</h3><div id="notificationTable" aria-live="polite"></div></div>
+            <div>
+              <h3>Editable budget grid</h3>
+              <div class="table-wrap" role="region" tabindex="0" aria-label="Editable budget grid">
+                <table>
+                  <caption class="sr-only">Editable budget grid validation row</caption>
+                  <thead><tr><th scope="col">Dept</th><th scope="col">Fund</th><th scope="col">Account</th><th scope="col">Period</th><th scope="col">Amount</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td><input id="gridDept" value="SCI" aria-label="Grid department code" /></td>
+                      <td><input id="gridFund" value="GEN" aria-label="Grid fund code" /></td>
+                      <td><input id="gridAccount" value="SUPPLIES" aria-label="Grid account code" /></td>
+                      <td><input id="gridPeriod" value="2026-08" aria-label="Grid fiscal period" /></td>
+                      <td><input id="gridAmount" value="-1250" aria-label="Grid amount" inputmode="decimal" aria-describedby="gridValidationMessage" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p id="gridValidationMessage" class="muted" role="status" aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="grid two">
+            <div>
+              <h3>Bulk paste</h3>
+              <textarea id="bulkPasteText" rows="5" aria-label="Bulk paste budget rows">department_code	fund_code	account_code	period	amount	notes
+SCI	GEN	SUPPLIES	2026-08	-1250	Bulk paste row</textarea>
+              <div id="bulkPasteHistoryTable"></div>
+            </div>
+            <div><h3>Missing submissions</h3><div id="missingSubmissionTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Department comparison</h3><div id="departmentComparisonTable"></div></div>
+          </div>
+        </section>
+
+        <section id="summary" class="grid three"></section>
+
+        <section id="ledger-depth" class="panel">
+          <div class="section-header">
+            <h2>Ledger depth and actuals</h2>
+            <div class="hero-actions">
+              <button id="addJournalButton">Add journal</button>
+              <button id="approveScenarioButton">Approve scenario</button>
+              <button id="publishScenarioButton" class="primary">Publish scenario</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Ledger basis</h3><div id="ledgerBasisTable"></div></div>
+            <div><h3>Journal adjustments</h3><div id="journalTable"></div></div>
+          </div>
+        </section>
+
+        <section class="grid two">
+          <section class="panel">
+            <h2>Department position</h2>
+            <div id="departmentTable"></div>
+          </section>
+          <section class="panel">
+            <h2>Account position</h2>
+            <div id="accountTable"></div>
+          </section>
+        </section>
+
+        <section id="operating-budget" class="panel">
+          <div class="section-header">
+            <h2>Operating budget workspace</h2>
+            <div class="hero-actions">
+              <button id="createSubmissionButton">Create submission</button>
+              <button id="addAssumptionButton">Add assumption</button>
+              <button id="requestTransferButton">Request transfer</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div>
+              <h3>Submissions</h3>
+              <div id="submissionTable"></div>
+            </div>
+            <div>
+              <h3>Assumptions</h3>
+              <div id="assumptionTable"></div>
+            </div>
+          </div>
+          <h3>Transfers</h3>
+          <div id="transferTable"></div>
+        </section>
+
+        <section id="enrollment" class="panel">
+          <div class="section-header">
+            <h2>Enrollment and tuition planning</h2>
+            <div class="hero-actions">
+              <button id="addTermButton">Add term</button>
+              <button id="addTuitionRateButton">Add rate</button>
+              <button id="addEnrollmentInputButton">Add input</button>
+              <button id="runTuitionForecastButton" class="primary">Run tuition forecast</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div>
+              <h3>Terms</h3>
+              <div id="enrollmentTermTable"></div>
+            </div>
+            <div>
+              <h3>Tuition rates</h3>
+              <div id="tuitionRateTable"></div>
+            </div>
+          </div>
+          <div class="grid two">
+            <div>
+              <h3>Forecast inputs</h3>
+              <div id="enrollmentInputTable"></div>
+            </div>
+            <div>
+              <h3>Forecast runs</h3>
+              <div id="tuitionRunTable"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="campus-planning" class="panel">
+          <div class="section-header">
+            <h2>Workforce, faculty, grants, and capital</h2>
+            <div class="hero-actions">
+              <button id="addPositionButton">Add position</button>
+              <button id="addFacultyLoadButton">Add faculty load</button>
+              <button id="addGrantButton">Add grant</button>
+              <button id="addCapitalButton">Add capital</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Positions</h3><div id="positionTable"></div></div>
+            <div><h3>Faculty load</h3><div id="facultyLoadTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Grant budgets</h3><div id="grantTable"></div></div>
+            <div><h3>Capital requests</h3><div id="capitalTable"></div></div>
+          </div>
+        </section>
+
+        <section id="scenario-engine" class="panel">
+          <div class="section-header">
+            <h2>Forecast and scenario engine</h2>
+            <div class="hero-actions">
+              <button id="addTypedDriverButton">Add driver</button>
+              <button id="cloneScenarioButton">Clone scenario</button>
+              <button id="runScenarioForecastButton" class="primary">Run forecast</button>
+              <button id="ingestActualsButton">Ingest actuals</button>
+              <button id="runForecastVarianceButton">Variance</button>
+              <button id="selectForecastModelButton">Select model</button>
+              <button id="tuneForecastModelButton">Tune</button>
+              <button id="runBacktestButton">Backtest</button>
+              <button id="compareForecastRecommendationsButton">Compare</button>
+              <button id="explainForecastDriversButton">Explain drivers</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Typed drivers</h3><div id="typedDriverTable"></div></div>
+            <div><h3>Forecast runs</h3><div id="scenarioForecastRunTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Forecast vs actual</h3><div id="forecastVarianceTable"></div></div>
+            <div><h3>Driver dependency graph</h3><div id="driverGraphTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Predictive model choices</h3><div id="forecastModelChoiceTable"></div></div>
+            <div><h3>Backtesting and accuracy</h3><div id="forecastBacktestTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Forecast recommendations</h3><div id="forecastRecommendationTable"></div></div>
+            <div><h3>Explainable drivers</h3><div id="forecastDriverExplanationTable"></div></div>
+          </div>
+        </section>
+
+        <section id="model-builder" class="panel">
+          <div class="section-header">
+            <h2>Model builder and allocations</h2>
+            <div class="hero-actions">
+              <button id="createModelButton">Create model</button>
+              <button id="addModelFormulaButton">Add formula</button>
+              <button id="addAllocationRuleButton">Add allocation</button>
+              <button id="buildModelCubeButton">Build cube</button>
+              <button id="publishModelButton">Publish</button>
+              <button id="testModelPerformanceButton">Perf test</button>
+              <button id="recalculateModelButton" class="primary">Recalculate</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Planning models</h3><div id="planningModelTable"></div></div>
+            <div><h3>Model formulas</h3><div id="modelFormulaTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Allocation rules</h3><div id="allocationRuleTable"></div></div>
+            <div><h3>Recalculation runs</h3><div id="modelRunTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Formula dependency graph</h3><div id="modelGraphTable"></div></div>
+            <div><h3>Enterprise cube dimensions</h3><div id="modelCubeDimensionTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Calculation order</h3><div id="modelCalculationOrderTable"></div></div>
+            <div><h3>Published model versions</h3><div id="modelVersionTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Dependency invalidations</h3><div id="modelInvalidationTable"></div></div>
+            <div><h3>Large-model performance tests</h3><div id="modelPerformanceTable"></div></div>
+          </div>
+        </section>
+
+        <section id="profitability" class="panel">
+          <div class="section-header">
+            <h2>Profitability and allocation management</h2>
+            <div class="hero-actions">
+              <button id="addProfitabilityPoolButton">Add cost pool</button>
+              <button id="runProfitabilityAllocationButton" class="primary">Run allocation</button>
+              <button id="snapshotProfitabilityButton">Snapshot</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Activity cost pools</h3><div id="profitabilityPoolTable"></div></div>
+            <div><h3>Service-center allocation runs</h3><div id="profitabilityAllocationRunTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Allocation trace report</h3><div id="profitabilityTraceTable"></div></div>
+            <div><h3>Before/after allocation comparison</h3><div id="profitabilityBeforeAfterTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Tuition and program margin</h3><div id="programMarginTable"></div></div>
+            <div><h3>Grant and fund profitability</h3><div id="fundGrantProfitabilityTable"></div></div>
+          </div>
+        </section>
+
+        <section id="reporting" class="panel">
+          <div class="section-header">
+            <h2>Reporting and analytics</h2>
+            <div class="hero-actions">
+              <button id="addReportButton">Add report</button>
+              <button id="addWidgetButton">Add widget</button>
+              <button id="scheduleExportButton" class="primary">Schedule export</button>
+              <button id="assembleBoardPackageButton">Board package</button>
+              <button id="createArtifactButton">Create file</button>
+              <button id="createSnapshotButton">Snapshot</button>
+              <button id="runExtractButton">Run extract</button>
+              <button id="setVarianceThresholdButton">Threshold</button>
+              <button id="generateVarianceExplanationsButton">Require comments</button>
+              <button id="draftVarianceNarrativesButton">AI draft</button>
+              <button id="addVarianceCommentaryButton">Commentary</button>
+              <button id="assembleNarrativeButton">Narrative</button>
+              <button id="createPaginationProfileButton">PDF pages</button>
+              <button id="addReportFootnoteButton">Footnote</button>
+              <button id="createBinderBreakButton">Binder break</button>
+              <button id="formatReportChartButton">Chart format</button>
+              <button id="renderReportChartButton">Render chart</button>
+              <button id="snapshotReportChartButton">Chart snapshot</button>
+              <button id="releaseBoardPackageButton">Approve release</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Report builder</h3><div id="reportDefinitionTable"></div></div>
+            <div><h3>Dashboard widgets</h3><div id="dashboardWidgetTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Financial statement</h3><div id="financialStatementTable"></div></div>
+            <div><h3>Scheduled exports</h3><div id="scheduledExportTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Actual/budget/forecast variance</h3><div id="abfVarianceTable"></div></div>
+            <div><h3>Board packages</h3><div id="boardPackageTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Export artifacts</h3><div id="exportArtifactTable"></div></div>
+            <div><h3>Report snapshots</h3><div id="snapshotTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Scheduled extract history</h3><div id="scheduledExtractRunTable"></div></div>
+            <div><h3>BI/API manifest</h3><div id="biApiManifestTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Variance thresholds</h3><div id="varianceThresholdTable"></div></div>
+            <div><h3>Variance commentary workflow</h3><div id="varianceExplanationTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Board narratives</h3><div id="narrativeReportTable"></div></div>
+            <div><h3>Narrative controls</h3><p class="muted">Drafted narrative text remains pending until approved.</p></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Pixel financial statement</h3><div id="pixelStatementTable"></div></div>
+            <div><h3>PDF pagination profiles</h3><div id="paginationProfileTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Footnotes</h3><div id="reportFootnoteTable"></div></div>
+            <div><h3>Page breaks</h3><div id="pageBreakTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Chart formatting</h3><div id="chartFormatTable"></div></div>
+            <div><h3>Board package release</h3><div id="boardReleaseTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Rendered chart exports</h3><div id="chartRenderTable"></div></div>
+            <div><h3>Dashboard chart snapshots</h3><div id="dashboardChartSnapshotTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Production PDF artifacts</h3><div id="productionPdfArtifactTable"></div></div>
+            <div><h3>Export validation</h3><div id="exportValidationTable"></div></div>
+          </div>
+        </section>
+
+        <section id="close" class="panel">
+          <div class="section-header">
+            <h2>Close, reconciliation, and consolidation</h2>
+            <div class="hero-actions">
+              <button id="addCloseTemplateButton">Add template</button>
+              <button id="addCloseCalendarButton">Calendar</button>
+              <button id="instantiateCloseButton">Build tasks</button>
+              <button id="addCloseChecklistButton">Add checklist</button>
+              <button id="addReconciliationButton">Add reconciliation</button>
+              <button id="addEntityConfirmationButton">Confirmation</button>
+              <button id="addConsolidationEntityButton">Entity</button>
+              <button id="addEntityOwnershipButton">Ownership</button>
+              <button id="addConsolidationSettingButton">GAAP/currency</button>
+              <button id="addConsolidationRuleButton">Rule</button>
+              <button id="addIntercompanyButton">Add match</button>
+              <button id="addEliminationButton">Add elimination</button>
+              <button id="assembleStatutoryPackButton">Stat pack</button>
+              <button id="runConsolidationButton" class="primary">Run consolidation</button>
+              <input id="periodLockInput" value="2026-08" aria-label="Period lock" />
+              <button id="lockPeriodButton">Lock</button>
+              <button id="unlockPeriodButton">Unlock</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Close task templates</h3><div id="closeTemplateTable"></div></div>
+            <div><h3>Period close calendar</h3><div id="closeCalendarTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Close checklist</h3><div id="closeChecklistTable"></div></div>
+            <div><h3>Task dependencies</h3><div id="closeDependencyTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Account reconciliations</h3><div id="reconciliationTable"></div></div>
+            <div><h3>Aging and exceptions</h3><div id="reconciliationExceptionTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Intercompany matches</h3><div id="intercompanyTable"></div></div>
+            <div><h3>Entity confirmations</h3><div id="entityConfirmationTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Entity hierarchy</h3><div id="consolidationEntityTable"></div></div>
+            <div><h3>Ownership percentages</h3><div id="entityOwnershipTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>GAAP and currency controls</h3><div id="consolidationSettingTable"></div></div>
+            <div><h3>Consolidation audit reports</h3><div id="consolidationAuditReportTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Eliminations</h3><div id="eliminationTable"></div></div>
+            <div><h3>Consolidation runs</h3><div id="consolidationRunTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Audit packets</h3><div id="auditPacketTable"></div></div>
+            <div><h3>Consolidation rules</h3><div id="consolidationRuleTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Ownership chains and minority interest</h3><div id="ownershipChainTable"></div></div>
+            <div><h3>CTA and currency translation</h3><div id="currencyTranslationAdjustmentTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Statutory packs</h3><div id="statutoryPackTable"></div></div>
+            <div><h3>Supplemental schedules</h3><div id="supplementalScheduleTable"></div></div>
+          </div>
+        </section>
+
+        <section id="line-items" class="panel">
+          <div class="section-header">
+            <h2>Budget lines</h2>
+            <span id="lineItemCount" class="tag"></span>
+          </div>
+          <div id="lineItemsTable"></div>
+        </section>
+
+        <section id="drivers" class="panel">
+          <h2>Planning drivers</h2>
+          <div id="driversTable"></div>
+        </section>
+
+        <section id="workflow" class="panel">
+          <div class="section-header">
+            <h2>Workflow and process orchestration</h2>
+            <div class="hero-actions">
+              <button id="saveWorkflowVisualButton">Visual layout</button>
+              <button id="addProcessCalendarButton">Calendar</button>
+              <button id="addSubstituteApproverButton">Substitute</button>
+              <button id="assembleWorkflowCertificationButton">Cert packet</button>
+              <button id="monitorWorkflowCampaignButton" class="primary">Monitor</button>
+            </div>
+          </div>
+          <div id="workflowTable"></div>
+          <div class="grid two">
+            <div><h3>Workflow templates</h3><div id="workflowTemplateTable"></div></div>
+            <div><h3>Visual workflow designs</h3><div id="workflowVisualTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Process calendars</h3><div id="processCalendarTable"></div></div>
+            <div><h3>Substitute approvers</h3><div id="substituteApproverTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Certification packets</h3><div id="workflowCertificationPacketTable"></div></div>
+            <div><h3>Campaign monitoring</h3><div id="workflowCampaignMonitorTable"></div></div>
+          </div>
+        </section>
+
+        <section id="integrations" class="panel">
+          <div class="section-header">
+            <h2>Campus integrations</h2>
+            <div class="hero-actions">
+              <button id="addConnectorButton">Add connector</button>
+              <button id="runImportButton">Run import</button>
+              <button id="previewImportButton">Preview import</button>
+              <button id="addMappingTemplateButton">Mapping</button>
+              <button id="addValidationRuleButton">Rule</button>
+              <button id="addCredentialButton">Credential</button>
+              <button id="startConnectorAuthButton">Auth flow</button>
+              <button id="runConnectorHealthButton">Health</button>
+              <button id="applyMappingPresetButton">Preset</button>
+              <button id="runSyncJobButton">Run sync</button>
+              <button id="createPowerBiExportButton" class="primary">Power BI export</button>
+            </div>
+          </div>
+          <p class="muted section-note">
+            Import CSV or tab-delimited exports from Prophix, ERP, SIS, HR, payroll, grants, banking, CRM, or any system that can export rows.
+          </p>
+          <div class="grid two">
+            <div><h3>Seeded registry</h3><div id="integrationsTable"></div></div>
+            <div><h3>Connectors</h3><div id="connectorTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Import batches</h3><div id="importBatchTable"></div></div>
+            <div><h3>Rejections</h3><div id="importRejectionTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Staged import previews</h3><div id="stagingBatchTable"></div></div>
+            <div><h3>Staged row drill-back</h3><div id="stagingRowTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Sync jobs</h3><div id="syncJobTable"></div></div>
+            <div><h3>Power BI exports</h3><div id="powerBiExportTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Mapping templates</h3><div id="mappingTemplateTable"></div></div>
+            <div><h3>Validation rules</h3><div id="validationRuleTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Credential vault</h3><div id="credentialTable"></div></div>
+            <div><h3>Retry events</h3><div id="retryEventTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Connector sync logs</h3><div id="syncLogTable"></div></div>
+            <div><h3>Banking cash imports</h3><div id="bankingCashImportTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>CRM enrollment pipeline</h3><div id="crmEnrollmentImportTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Marketplace adapters</h3><div id="adapterTable"></div></div>
+            <div><h3>Connector health</h3><div id="connectorHealthTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Auth flows</h3><div id="authFlowTable"></div></div>
+            <div><h3>Mapping presets</h3><div id="mappingPresetTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Source drill-back</h3><div id="sourceDrillbackTable"></div></div>
+          </div>
+        </section>
+
+        <section id="data-hub" class="panel">
+          <div class="section-header">
+            <h2>Data hub and master data governance</h2>
+            <div class="hero-actions">
+              <button id="requestMasterDataChangeButton">Request change</button>
+              <button id="approveMasterDataChangeButton">Approve first</button>
+              <button id="addMasterDataMappingButton">Add mapping</button>
+              <button id="requestMetadataApprovalButton">Metadata approval</button>
+              <button id="buildLineageButton" class="primary">Build lineage</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Governed hierarchy changes</h3><div id="masterDataChangeTable"></div></div>
+            <div><h3>Mapping crosswalks</h3><div id="masterDataMappingTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Metadata approvals</h3><div id="metadataApprovalTable"></div></div>
+            <div><h3>Source-to-report lineage</h3><div id="dataLineageTable"></div></div>
+          </div>
+        </section>
+
+        <section id="automation" class="panel">
+          <div class="section-header">
+            <h2>Governed automation</h2>
+            <div class="hero-actions">
+              <button id="runVarianceAssistantButton">Variance</button>
+              <button id="runAnomalyAssistantButton">Anomaly</button>
+              <button id="runBudgetAssistantButton">Budget</button>
+              <button id="runReconciliationAssistantButton" class="primary">Reconciliation</button>
+              <button id="runBudgetUpdateAgentButton">Budget update</button>
+              <button id="runBulkAdjustmentAgentButton">Bulk adjust</button>
+              <button id="runReportQuestionAgentButton">Ask report</button>
+              <button id="runAnomalyExplanationAgentButton">Explain anomaly</button>
+              <button id="approveAgentActionButton">Approve agent</button>
+              <button id="refreshUniversityAgentButton">University Agent</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Recommendations</h3><div id="automationRecommendationTable"></div></div>
+            <div><h3>Approval gates</h3><div id="automationGateTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Agent prompt audit</h3><div id="agentPromptTable"></div></div>
+            <div><h3>Guarded agent actions</h3><div id="agentActionTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>University Agent tool registry</h3><div id="universityAgentToolTable"></div></div>
+            <div><h3>University Agent signed requests</h3><div id="universityAgentRequestTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>University Agent policies</h3><div id="universityAgentPolicyTable"></div></div>
+            <div><h3>University Agent callbacks and audit</h3><div id="universityAgentAuditTable"></div></div>
+          </div>
+        </section>
+
+        <section id="ai-explainability" class="panel">
+          <div class="section-header">
+            <h2>AI explainability</h2>
+            <div class="hero-actions">
+              <button id="draftAIExplanationButton" class="primary">Draft cited explanations</button>
+              <button id="submitAIExplanationButton">Submit first</button>
+              <button id="approveAIExplanationButton">Approve first</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Cited explanations</h3><div id="aiExplanationTable"></div></div>
+            <div><h3>Source traces</h3><div id="aiTraceTable"></div></div>
+          </div>
+        </section>
+
+        <section id="operations" class="panel">
+          <div class="section-header">
+            <h2>Deployment operations</h2>
+            <div class="hero-actions">
+              <button id="runOpsCheckButton">Run check</button>
+              <button id="createOpsBackupButton">Create backup</button>
+              <button id="runRestoreTestButton">Restore test</button>
+              <button id="runHealthProbeButton">Health probes</button>
+              <button id="runBackupDrillButton">Backup drill</button>
+              <button id="registerRunbookButton" class="primary">Register runbook</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Operational checks</h3><div id="opsCheckTable"></div></div>
+            <div><h3>Restore tests</h3><div id="restoreTestTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Backups</h3><div id="opsBackupTable"></div></div>
+            <div><h3>Runbooks</h3><div id="runbookTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Health probes</h3><div id="healthProbeTable"></div></div>
+            <div><h3>Alert events</h3><div id="alertEventTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Operational metrics</h3><div id="observabilityMetricTable"></div></div>
+            <div><h3>Backup drills</h3><div id="backupDrillTable"></div></div>
+          </div>
+        </section>
+
+        <section id="performance-reliability" class="panel">
+          <div class="section-header">
+            <h2>Performance, scale, and reliability</h2>
+            <div class="hero-actions">
+              <button id="runBenchmarkHarnessButton" class="primary">Benchmark harness</button>
+              <button id="runParallelCubedButton">Parallel Cubed</button>
+              <button id="runPerformanceLoadTestButton">Run benchmark</button>
+              <button id="seedIndexStrategyButton">Index strategy</button>
+              <button id="enqueuePerformanceJobButton">Queue job</button>
+              <button id="runPerformanceJobButton">Run next job</button>
+              <button id="invalidateCacheButton">Invalidate cache</button>
+              <button id="runRestoreAutomationButton">Restore automation</button>
+            </div>
+          </div>
+          <div><h3>Benchmark harness</h3><div id="benchmarkHarnessTable"></div></div>
+          <div class="grid two">
+            <div><h3>Parallel Cubed benchmark dashboard</h3><div id="parallelCubedRunTable"></div></div>
+            <div><h3>Parallel Cubed partitions</h3><div id="parallelCubedPartitionTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Load and calculation tests</h3><div id="performanceLoadTestTable"></div></div>
+            <div><h3>Index recommendations</h3><div id="indexStrategyTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Background jobs</h3><div id="backgroundJobTable"></div></div>
+            <div><h3>Cache invalidation</h3><div id="cacheInvalidationTable"></div></div>
+          </div>
+          <div><h3>Backup restore automation</h3><div id="restoreAutomationTable"></div></div>
+        </section>
+
+        <section id="deployment-governance" class="panel">
+          <div class="section-header">
+            <h2>Deployment governance and release controls</h2>
+            <div class="hero-actions">
+              <button id="saveEnvironmentButton">Environment</button>
+              <button id="exportConfigButton">Export config</button>
+              <button id="promoteEnvironmentButton">Promote</button>
+              <button id="addRollbackPlanButton">Rollback plan</button>
+              <button id="publishReleaseNotesButton">Release notes</button>
+              <button id="runAdminDiagnosticsButton">Diagnostics</button>
+              <button id="markReadinessButton" class="primary">Readiness</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Tenant and environment settings</h3><div id="environmentSettingsTable"></div></div>
+            <div><h3>Environment promotions</h3><div id="environmentPromotionTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Config export/import</h3><div id="configSnapshotTable"></div></div>
+            <div><h3>Migration rollback plans</h3><div id="rollbackPlanTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Release notes</h3><div id="releaseNoteTable"></div></div>
+            <div><h3>Admin diagnostics</h3><div id="adminDiagnosticTable"></div></div>
+          </div>
+          <div><h3>Operational readiness checklist</h3><div id="readinessChecklistTable"></div></div>
+        </section>
+
+        <section id="compliance" class="panel">
+          <div class="section-header">
+            <h2>Compliance and audit hardening</h2>
+            <div class="hero-actions">
+              <button id="sealAuditButton">Seal audit</button>
+              <button id="verifyAuditButton">Verify audit</button>
+              <button id="addRetentionPolicyButton">Retention policy</button>
+              <button id="classifyTaxActivityButton">Tax classify</button>
+              <button id="runTaxUpdateCheckButton">Tax check</button>
+              <button id="createCertificationButton" class="primary">Certification</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Audit integrity</h3><div id="auditIntegrityTable"></div></div>
+            <div><h3>SoD checks</h3><div id="sodViolationTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Retention policies</h3><div id="retentionPolicyTable"></div></div>
+            <div><h3>Certifications</h3><div id="certificationTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Tax classifications</h3><div id="taxClassificationTable"></div></div>
+            <div><h3>Form 990 support</h3><div id="form990SupportTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Tax rule sources</h3><div id="taxRuleSourceTable"></div></div>
+            <div><h3>Tax alerts</h3><div id="taxAlertTable"></div></div>
+          </div>
+        </section>
+
+        <section id="enterprise-security" class="panel">
+          <div class="section-header">
+            <h2>Enterprise security administration</h2>
+            <div class="hero-actions">
+              <button id="configureSSOProductionButton">SSO wiring</button>
+              <button id="addADOUGroupMappingButton">AD/OU map</button>
+              <button id="runDomainVPNCheckButton">Domain check</button>
+              <button id="startImpersonationButton">Impersonate</button>
+              <button id="addSoDPolicyButton">SoD policy</button>
+              <button id="createAccessReviewButton" class="primary">Access review</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>SSO production wiring</h3><div id="ssoProductionTable"></div></div>
+            <div><h3>AD/OU group mappings</h3><div id="adOuMappingTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>Domain and VPN enforcement</h3><div id="domainVpnCheckTable"></div></div>
+            <div><h3>Admin impersonation controls</h3><div id="impersonationTable"></div></div>
+          </div>
+          <div class="grid two">
+            <div><h3>SoD policy builder</h3><div id="sodPolicyTable"></div></div>
+            <div><h3>User access review certification</h3><div id="accessReviewTable"></div></div>
+          </div>
+        </section>
+
+        <section id="evidence" class="panel">
+          <div class="section-header">
+            <h2>Comments, attachments, and evidence</h2>
+            <div class="hero-actions">
+              <button id="addCommentButton">Add comment</button>
+              <button id="addAttachmentButton" class="primary">Add attachment</button>
+            </div>
+          </div>
+          <div class="grid two">
+            <div><h3>Recent comments</h3><div id="commentTable"></div></div>
+            <div><h3>Evidence attachments</h3><div id="attachmentTable"></div></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Capability map</h2>
+          <div id="capabilityMap"></div>
+        </section>
+      </main>
+    </div>
+
+    <aside id="marketSatellite" class="market-satellite hidden" aria-labelledby="marketSatelliteTitle" aria-live="polite">
+      <div class="market-satellite-header">
+        <div>
+          <p class="eyebrow">Paper lab</p>
+          <h2 id="marketSatelliteTitle">Market Watch</h2>
+        </div>
+        <button id="marketCloseButton" type="button" aria-label="Close Market Watch">Close</button>
+      </div>
+      <div id="marketTicker" class="market-ticker"></div>
+      <div class="market-search">
+        <input id="marketSearchInput" aria-label="Search stock symbol" placeholder="Search symbol, e.g. AAPL" value="DOW" />
+        <button id="marketSearchButton" class="primary" type="button">Search</button>
+        <button id="marketFavoriteButton" type="button">Save favorite</button>
+      </div>
+      <div class="grid two">
+        <div>
+          <h3>Search results</h3>
+          <div id="marketSearchTable"></div>
+        </div>
+        <div>
+          <h3>Favorites</h3>
+          <div id="marketFavoriteTable"></div>
+        </div>
+      </div>
+      <div class="market-trade-row">
+        <input id="tradeSymbolInput" aria-label="Trade symbol" value="DIA" />
+        <input id="tradeQuantityInput" aria-label="Trade quantity" type="number" min="1" step="1" value="1" />
+        <button id="paperBuyButton" class="primary" type="button">Buy</button>
+        <button id="paperSellButton" type="button">Sell</button>
+        <button id="paperResetButton" type="button">Reset $100k</button>
+      </div>
+      <div class="grid two">
+        <div>
+          <h3>Paper account</h3>
+          <div id="paperAccountTable"></div>
+        </div>
+        <div>
+          <h3>Positions</h3>
+          <div id="paperPositionTable"></div>
+        </div>
+      </div>
+      <h3>Trade history</h3>
+      <div id="paperTradeTable"></div>
+      <section class="market-brokerage" aria-labelledby="brokerageConnectorTitle">
+        <div class="section-toolbar">
+          <div>
+            <p class="eyebrow">Read-only connectors</p>
+            <h3 id="brokerageConnectorTitle">Brokerage accounts</h3>
+          </div>
+          <div class="toolbar-actions">
+            <select id="brokerageProviderSelect" aria-label="Brokerage provider"></select>
+            <select id="brokerageModeSelect" aria-label="Brokerage mode">
+              <option value="sandbox">Sandbox</option>
+              <option value="live">Live read-only</option>
+            </select>
+            <button id="brokerageCreateButton" type="button">Connect brokerage account</button>
+            <button id="brokerageCredentialButton" type="button">Credential/OAuth</button>
+            <button id="brokerageConsentButton" type="button">Consent</button>
+            <button id="brokerageTestButton" type="button">Test connector</button>
+            <button id="brokerageSyncButton" class="primary" type="button">Sync holdings</button>
+          </div>
+        </div>
+        <p class="muted">Brokerage connectors are read-only. Live providers require consent and vault/OAuth credential setup before sync; real-money trading is disabled.</p>
+        <div class="grid two">
+          <div><h3>Connections</h3><div id="brokerageConnectionTable"></div></div>
+          <div><h3>Accounts</h3><div id="brokerageAccountTable"></div></div>
+        </div>
+        <div class="grid two">
+          <div><h3>Holdings</h3><div id="brokerageHoldingTable"></div></div>
+          <div><h3>Sync log</h3><div id="brokerageSyncTable"></div></div>
+        </div>
+        <div class="grid two">
+          <div><h3>Consent records</h3><div id="brokerageConsentTable"></div></div>
+          <div><h3>Brokerage audit trail</h3><div id="brokerageAuditTable"></div></div>
+        </div>
+      </section>
+    </aside>
+
+    <aside id="chatSatellite" class="chat-satellite hidden" aria-labelledby="chatSatelliteTitle" aria-live="polite">
+      <div class="chat-satellite-header">
+        <div>
+          <p class="eyebrow">Direct message</p>
+          <h2 id="chatSatelliteTitle">muFinances Chat</h2>
+        </div>
+        <button id="chatCloseButton" type="button" aria-label="Close chat">Close</button>
+      </div>
+      <div class="chat-recipient-row">
+        <label for="chatRecipientSelect">Send to</label>
+        <select id="chatRecipientSelect"></select>
+        <button id="chatRefreshButton" type="button">Refresh</button>
+      </div>
+      <div id="chatMessages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages"></div>
+      <div class="chat-compose">
+        <textarea id="chatMessageInput" rows="3" maxlength="2000" aria-label="Chat message" placeholder="Type a message"></textarea>
+        <button id="chatSendButton" class="primary" type="button">Send</button>
+      </div>
+      <p id="chatStatus" class="muted" role="status" aria-live="polite"></p>
+    </aside>
+
+    <dialog id="scenarioDialog">
+      <form id="scenarioForm" method="dialog">
+        <h2>Create scenario</h2>
+        <label>Name <input name="name" required minlength="3" value="FY28 Operating Plan" /></label>
+        <label>Version <input name="version" required value="v1" /></label>
+        <label>Start period <input name="start_period" required value="2027-07" pattern="\d{4}-\d{2}" /></label>
+        <label>End period <input name="end_period" required value="2027-12" pattern="\d{4}-\d{2}" /></label>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button value="submit" class="primary">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="lineDialog">
+      <form id="lineForm" method="dialog">
+        <h2>Add line item</h2>
+        <label>Department <input name="department_code" required value="SCI" /></label>
+        <label>Fund <input name="fund_code" required value="GEN" /></label>
+        <label>Account <input name="account_code" required value="SALARY" /></label>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Amount <input name="amount" required type="number" step="0.01" value="-10000" /></label>
+        <label>Notes <input name="notes" value="Added from UI" /></label>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button value="submit" class="primary">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="guidedManualDialog">
+      <form id="guidedManualForm" method="dialog">
+        <h2>Guided data entry</h2>
+        <p class="muted">Use this when you have one number to enter and know the department, account, period, and amount.</p>
+        <label>Department <input name="department_code" required value="SCI" /></label>
+        <label>Fund <input name="fund_code" required value="GEN" /></label>
+        <label>Account <input name="account_code" required value="SUPPLIES" /></label>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Amount <input name="amount" required type="number" step="0.01" value="-1000" /></label>
+        <label>What is this? <input name="notes" value="Guided entry" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save data</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="journalDialog">
+      <form id="journalForm" method="dialog">
+        <h2>Add journal adjustment</h2>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Department <input name="department_code" required value="SCI" /></label>
+        <label>Fund <input name="fund_code" required value="GEN" /></label>
+        <label>Account <input name="account_code" required value="SUPPLIES" /></label>
+        <label>Basis
+          <select name="ledger_basis">
+            <option value="actual">Actual</option>
+            <option value="budget">Budget</option>
+            <option value="forecast">Forecast</option>
+            <option value="scenario">Scenario</option>
+          </select>
+        </label>
+        <label>Amount <input name="amount" type="number" step="0.01" required value="-500" /></label>
+        <label>Reason <input name="reason" required value="Journal adjustment" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="submissionDialog">
+      <form id="submissionForm" method="dialog">
+        <h2>Create operating budget submission</h2>
+        <label>Department <input name="department_code" required value="SCI" /></label>
+        <label>Owner <input name="owner" required value="Budget Office" /></label>
+        <label>Notes <input name="notes" value="Department operating budget" /></label>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button value="submit" class="primary">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="assumptionDialog">
+      <form id="assumptionForm" method="dialog">
+        <h2>Add budget assumption</h2>
+        <label>Key <input name="assumption_key" required value="supply_inflation" /></label>
+        <label>Label <input name="label" required value="Supply inflation" /></label>
+        <label>Value <input name="value" type="number" step="0.0001" required value="0.035" /></label>
+        <label>Unit <input name="unit" required value="ratio" /></label>
+        <label>Department <input name="department_code" value="SCI" /></label>
+        <label>Notes <input name="notes" value="Operating budget assumption" /></label>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button value="submit" class="primary">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="transferDialog">
+      <form id="transferForm" method="dialog">
+        <h2>Request budget transfer</h2>
+        <label>From department <input name="from_department_code" required value="SCI" /></label>
+        <label>To department <input name="to_department_code" required value="OPS" /></label>
+        <label>Fund <input name="fund_code" required value="GEN" /></label>
+        <label>Account <input name="account_code" required value="SUPPLIES" /></label>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Amount <input name="amount" type="number" step="0.01" required value="1000" /></label>
+        <label>Reason <input name="reason" required value="Move supply budget to operations" /></label>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button value="submit" class="primary">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="termDialog">
+      <form id="termForm" method="dialog">
+        <h2>Add enrollment term</h2>
+        <label>Term code <input name="term_code" required value="2026FA" /></label>
+        <label>Term name <input name="term_name" required value="Fall 2026" /></label>
+        <label>Ledger period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Census date <input name="census_date" value="2026-09-15" /></label>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button value="submit" class="primary">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="tuitionRateDialog">
+      <form id="tuitionRateForm" method="dialog">
+        <h2>Add tuition rate</h2>
+        <label>Program <input name="program_code" required value="BIO-BS" /></label>
+        <label>Residency <input name="residency" required value="resident" /></label>
+        <label>Rate per credit <input name="rate_per_credit" type="number" step="0.01" required value="500" /></label>
+        <label>Credit load <input name="default_credit_load" type="number" step="0.1" required value="12" /></label>
+        <label>Effective term <input name="effective_term" required value="2026FA" /></label>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button value="submit" class="primary">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="enrollmentInputDialog">
+      <form id="enrollmentInputForm" method="dialog">
+        <h2>Add enrollment input</h2>
+        <label>Term <input name="term_code" required value="2026FA" /></label>
+        <label>Program <input name="program_code" required value="BIO-BS" /></label>
+        <label>Residency <input name="residency" required value="resident" /></label>
+        <label>Headcount <input name="headcount" type="number" step="0.1" required value="100" /></label>
+        <label>FTE <input name="fte" type="number" step="0.1" required value="90" /></label>
+        <label>Retention <input name="retention_rate" type="number" step="0.0001" required value="0.9" /></label>
+        <label>Yield <input name="yield_rate" type="number" step="0.0001" required value="0.8" /></label>
+        <label>Discount <input name="discount_rate" type="number" step="0.0001" required value="0.2" /></label>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button value="submit" class="primary">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="tuitionRunDialog">
+      <form id="tuitionRunForm" method="dialog">
+        <h2>Run tuition forecast</h2>
+        <label>Term <input name="term_code" required value="2026FA" /></label>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button value="submit" class="primary">Run</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="positionDialog">
+      <form id="positionForm" method="dialog">
+        <h2>Add position</h2>
+        <label>Code <input name="position_code" required value="SCI-FAC-001" /></label>
+        <label>Title <input name="title" required value="Assistant Professor" /></label>
+        <label>Department <input name="department_code" required value="SCI" /></label>
+        <label>Type <input name="employee_type" required value="faculty" /></label>
+        <label>FTE <input name="fte" type="number" step="0.01" required value="1" /></label>
+        <label>Salary <input name="annual_salary" type="number" step="0.01" required value="90000" /></label>
+        <label>Benefit rate <input name="benefit_rate" type="number" step="0.0001" required value="0.28" /></label>
+        <label>Vacancy rate <input name="vacancy_rate" type="number" step="0.0001" required value="0.1" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="facultyLoadDialog">
+      <form id="facultyLoadForm" method="dialog">
+        <h2>Add faculty load</h2>
+        <label>Department <input name="department_code" required value="SCI" /></label>
+        <label>Term <input name="term_code" required value="2026FA" /></label>
+        <label>Course <input name="course_code" required value="BIO101" /></label>
+        <label>Sections <input name="sections" type="number" required value="4" /></label>
+        <label>Credit hours <input name="credit_hours" type="number" step="0.1" required value="12" /></label>
+        <label>Faculty FTE <input name="faculty_fte" type="number" step="0.1" required value="1.2" /></label>
+        <label>Adjunct cost <input name="adjunct_cost" type="number" step="0.01" required value="6000" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="grantDialog">
+      <form id="grantForm" method="dialog">
+        <h2>Add grant budget</h2>
+        <label>Grant <input name="grant_code" required value="NSF-001" /></label>
+        <label>Department <input name="department_code" required value="SCI" /></label>
+        <label>Sponsor <input name="sponsor" required value="NSF" /></label>
+        <label>Start <input name="start_period" required value="2026-07" pattern="\d{4}-\d{2}" /></label>
+        <label>End <input name="end_period" required value="2026-12" pattern="\d{4}-\d{2}" /></label>
+        <label>Total award <input name="total_award" type="number" step="0.01" required value="200000" /></label>
+        <label>Direct budget <input name="direct_cost_budget" type="number" step="0.01" required value="150000" /></label>
+        <label>Indirect rate <input name="indirect_cost_rate" type="number" step="0.0001" required value="0.1" /></label>
+        <label>Spent to date <input name="spent_to_date" type="number" step="0.01" required value="50000" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="capitalDialog">
+      <form id="capitalForm" method="dialog">
+        <h2>Add capital request</h2>
+        <label>Request <input name="request_code" required value="CAP-SCI-001" /></label>
+        <label>Department <input name="department_code" required value="SCI" /></label>
+        <label>Project <input name="project_name" required value="Lab Equipment Refresh" /></label>
+        <label>Category <input name="asset_category" required value="equipment" /></label>
+        <label>Period <input name="acquisition_period" required value="2026-09" pattern="\d{4}-\d{2}" /></label>
+        <label>Cost <input name="capital_cost" type="number" step="0.01" required value="50000" /></label>
+        <label>Life years <input name="useful_life_years" type="number" required value="5" /></label>
+        <label>Funding <input name="funding_source" required value="GEN" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="typedDriverDialog">
+      <form id="typedDriverForm" method="dialog">
+        <h2>Add typed driver</h2>
+        <label>Key <input name="driver_key" required value="tuition_growth" /></label>
+        <label>Label <input name="label" required value="Tuition growth" /></label>
+        <label>Type <input name="driver_type" required value="ratio" /></label>
+        <label>Unit <input name="unit" required value="ratio" /></label>
+        <label>Value <input name="value" type="number" step="0.0001" required value="0.05" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="cloneScenarioDialog">
+      <form id="cloneScenarioForm" method="dialog">
+        <h2>Clone scenario</h2>
+        <label>Name <input name="name" required value="FY27 Operating Plan Upside" /></label>
+        <label>Version <input name="version" required value="upside" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Clone</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="scenarioForecastDialog">
+      <form id="scenarioForecastForm" method="dialog">
+        <h2>Run scenario forecast</h2>
+        <label>Method
+          <select name="method_key">
+            <option value="growth_rate">Growth rate</option>
+            <option value="straight_line">Straight line</option>
+            <option value="rolling_average">Rolling average</option>
+            <option value="driver_based">Driver based</option>
+            <option value="seasonal">Seasonal</option>
+            <option value="historical_trend">Historical trend</option>
+          </select>
+        </label>
+        <label>Account <input name="account_code" required value="TUITION" /></label>
+        <label>Department <input name="department_code" value="SCI" /></label>
+        <label>Start <input name="period_start" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>End <input name="period_end" required value="2026-09" pattern="\d{4}-\d{2}" /></label>
+        <label>Driver <input name="driver_key" value="tuition_growth" /></label>
+        <label>Confidence <input name="confidence" type="number" step="0.01" required value="0.85" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Run</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="actualsDialog">
+      <form id="actualsForm" method="dialog">
+        <h2>Ingest actuals</h2>
+        <label>Source version <input name="source_version" required value="actuals-2026-08" /></label>
+        <label>Department <input name="department_code" required value="SCI" /></label>
+        <label>Fund <input name="fund_code" required value="GEN" /></label>
+        <label>Account <input name="account_code" required value="TUITION" /></label>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Amount <input name="amount" type="number" step="0.01" required value="100000" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Ingest</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="reportDefinitionDialog">
+      <form id="reportDefinitionForm" method="dialog">
+        <h2>Add report</h2>
+        <label>Name <input name="name" required value="Department by account" /></label>
+        <label>Type
+          <select name="report_type">
+            <option value="ledger_matrix">Ledger matrix</option>
+            <option value="financial_statement">Financial statement</option>
+            <option value="variance">Variance</option>
+          </select>
+        </label>
+        <label>Rows
+          <select name="row_dimension">
+            <option value="department_code">Department</option>
+            <option value="account_code">Account</option>
+            <option value="fund_code">Fund</option>
+            <option value="period">Period</option>
+          </select>
+        </label>
+        <label>Columns
+          <select name="column_dimension">
+            <option value="account_code">Account</option>
+            <option value="department_code">Department</option>
+            <option value="fund_code">Fund</option>
+            <option value="period">Period</option>
+          </select>
+        </label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="dashboardWidgetDialog">
+      <form id="dashboardWidgetForm" method="dialog">
+        <h2>Add dashboard widget</h2>
+        <label>Name <input name="name" required value="Net position" /></label>
+        <label>Type
+          <select name="widget_type">
+            <option value="metric">Metric</option>
+            <option value="variance">Variance</option>
+            <option value="trend">Trend</option>
+          </select>
+        </label>
+        <label>Metric
+          <select name="metric_key">
+            <option value="net_total">Net total</option>
+            <option value="revenue_total">Revenue</option>
+            <option value="expense_total">Expenses</option>
+          </select>
+        </label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="scheduledExportDialog">
+      <form id="scheduledExportForm" method="dialog">
+        <h2>Schedule export</h2>
+        <label>Report <select id="exportReportSelect" name="report_definition_id"></select></label>
+        <label>Format
+          <select name="export_format">
+            <option value="json">JSON</option>
+            <option value="csv">CSV</option>
+            <option value="xlsx">XLSX</option>
+            <option value="pdf">PDF</option>
+          </select>
+        </label>
+        <label>Schedule <input name="schedule_cron" required value="0 7 * * 1" /></label>
+        <label>Destination <input name="destination" required value="board-pack" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="boardPackageDialog">
+      <form id="boardPackageForm" method="dialog">
+        <h2>Assemble board package</h2>
+        <label>Name <input name="package_name" required value="FY27 Board Package" /></label>
+        <label>Start <input name="period_start" required value="2026-07" pattern="\d{4}-\d{2}" /></label>
+        <label>End <input name="period_end" required value="2026-12" pattern="\d{4}-\d{2}" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Assemble</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="exportArtifactDialog">
+      <form id="exportArtifactForm" method="dialog">
+        <h2>Create export file</h2>
+        <label>Type
+          <select name="artifact_type">
+            <option value="excel">Excel</option>
+            <option value="pdf">PDF</option>
+            <option value="email">Email package</option>
+            <option value="bi_api">BI/API JSON</option>
+          </select>
+        </label>
+        <label>File name <input name="file_name" required value="board-package" /></label>
+        <label>Board package <select id="artifactPackageSelect" name="package_id"></select></label>
+        <label>Retention until <input name="retention_until" value="2033-06-30" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Create</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="snapshotDialog">
+      <form id="snapshotForm" method="dialog">
+        <h2>Create snapshot</h2>
+        <label>Type
+          <select name="snapshot_type">
+            <option value="board_package">Board package</option>
+            <option value="report_export">Report export</option>
+            <option value="bi_api">BI/API</option>
+          </select>
+        </label>
+        <label>Retention until <input name="retention_until" value="2033-06-30" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Create</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="extractRunDialog">
+      <form id="extractRunForm" method="dialog">
+        <h2>Run scheduled extract</h2>
+        <label>Scheduled export <select id="extractExportSelect" name="export_id"></select></label>
+        <label>Destination <input name="destination" required value="bi-api-drop" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Run</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="varianceThresholdDialog">
+      <form id="varianceThresholdForm" method="dialog">
+        <h2>Variance threshold</h2>
+        <label>Key <input name="threshold_key" required value="material-variance" /></label>
+        <label>Amount <input name="amount_threshold" type="number" min="0" step="0.01" required value="10000" /></label>
+        <label>Percent <input name="percent_threshold" type="number" min="0" step="0.01" value="" /></label>
+        <label><input name="require_explanation" type="checkbox" checked /> Require explanation</label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="varianceExplanationDialog">
+      <form id="varianceExplanationForm" method="dialog">
+        <h2>Add variance commentary</h2>
+        <label>Variance <select id="varianceExplanationSelect" name="variance_key"></select></label>
+        <label>Commentary <input name="explanation_text" required value="Variance is driven by timing and will be monitored through close." /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="narrativeDialog">
+      <form id="narrativeForm" method="dialog">
+        <h2>Assemble board narrative</h2>
+        <label>Title <input name="title" required value="FY27 Board Narrative" /></label>
+        <label>Board package <select id="narrativePackageSelect" name="package_id"></select></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Assemble</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="closeChecklistDialog">
+      <form id="closeChecklistForm" method="dialog">
+        <h2>Add close checklist item</h2>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Key <input name="checklist_key" required value="ledger-review" /></label>
+        <label>Title <input name="title" required value="Review planning ledger" /></label>
+        <label>Owner <input name="owner" required value="Controller" /></label>
+        <label>Due date <input name="due_date" value="2026-09-05" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="closeTemplateDialog">
+      <form id="closeTemplateForm" method="dialog">
+        <h2>Add close template</h2>
+        <label>Key <input name="template_key" required value="subledger-review" /></label>
+        <label>Title <input name="title" required value="Review subledger support" /></label>
+        <label>Owner role <input name="owner_role" required value="Controller" /></label>
+        <label>Due offset <input name="due_day_offset" type="number" required value="0" /></label>
+        <label>Dependencies <input name="dependency_keys" value="ledger-review" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="closeCalendarDialog">
+      <form id="closeCalendarForm" method="dialog">
+        <h2>Period close calendar</h2>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Start <input name="close_start" required value="2026-09-01" /></label>
+        <label>Due <input name="close_due" required value="2026-09-05" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="instantiateCloseDialog">
+      <form id="instantiateCloseForm" method="dialog">
+        <h2>Build close tasks</h2>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Build</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="reconciliationDialog">
+      <form id="reconciliationForm" method="dialog">
+        <h2>Add account reconciliation</h2>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Entity <input name="entity_code" required value="CAMPUS" /></label>
+        <label>Account <input name="account_code" required value="TUITION" /></label>
+        <label>Source balance <input name="source_balance" type="number" step="0.01" required value="1125000" /></label>
+        <label>Owner <input name="owner" required value="Controller" /></label>
+        <label>Notes <input name="notes" value="Ties to source detail" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="entityConfirmationDialog">
+      <form id="entityConfirmationForm" method="dialog">
+        <h2>Request entity confirmation</h2>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Entity <input name="entity_code" required value="CAMPUS" /></label>
+        <label>Type
+          <select name="confirmation_type">
+            <option value="balance">Balance</option>
+            <option value="intercompany">Intercompany</option>
+            <option value="subledger">Subledger</option>
+            <option value="management">Management</option>
+          </select>
+        </label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Request</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="consolidationEntityDialog">
+      <form id="consolidationEntityForm" method="dialog">
+        <h2>Add consolidation entity</h2>
+        <label>Code <input name="entity_code" required value="CAMPUS" /></label>
+        <label>Name <input name="entity_name" required value="Campus" /></label>
+        <label>Parent <input name="parent_entity_code" value="" /></label>
+        <label>Currency <input name="base_currency" required value="USD" /></label>
+        <label>GAAP <input name="gaap_basis" required value="US_GAAP" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="entityOwnershipDialog">
+      <form id="entityOwnershipForm" method="dialog">
+        <h2>Add ownership</h2>
+        <label>Parent <input name="parent_entity_code" required value="CAMPUS" /></label>
+        <label>Child <input name="child_entity_code" required value="FOUNDATION" /></label>
+        <label>Ownership <input name="ownership_percent" type="number" min="0" max="100" step="0.01" required value="100" /></label>
+        <label>Effective period <input name="effective_period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="consolidationSettingDialog">
+      <form id="consolidationSettingForm" method="dialog">
+        <h2>GAAP and currency controls</h2>
+        <label>GAAP <input name="gaap_basis" required value="US_GAAP" /></label>
+        <label>Currency <input name="reporting_currency" required value="USD" /></label>
+        <label>Translation <input name="translation_method" required value="placeholder" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="intercompanyDialog">
+      <form id="intercompanyForm" method="dialog">
+        <h2>Add intercompany match</h2>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Source entity <input name="source_entity_code" required value="CAMPUS" /></label>
+        <label>Target entity <input name="target_entity_code" required value="FOUNDATION" /></label>
+        <label>Account <input name="account_code" required value="TRANSFER" /></label>
+        <label>Source amount <input name="source_amount" type="number" step="0.01" required value="25000" /></label>
+        <label>Target amount <input name="target_amount" type="number" step="0.01" required value="-25000" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="eliminationDialog">
+      <form id="eliminationForm" method="dialog">
+        <h2>Add elimination</h2>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Entity <input name="entity_code" required value="CAMPUS" /></label>
+        <label>Account <input name="account_code" required value="TRANSFER" /></label>
+        <label>Amount <input name="amount" type="number" step="0.01" required value="-25000" /></label>
+        <label>Reason <input name="reason" required value="Eliminate internal campus transfer" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="consolidationDialog">
+      <form id="consolidationForm" method="dialog">
+        <h2>Run consolidation</h2>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Run</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="connectorDialog">
+      <form id="connectorForm" method="dialog">
+        <h2>Add connector</h2>
+        <label>Key <input name="connector_key" required value="erp-gl" /></label>
+        <label>Name <input name="name" required value="ERP General Ledger" /></label>
+        <label>System
+          <select name="system_type">
+            <option value="erp">ERP</option>
+            <option value="sis">SIS</option>
+            <option value="hr">HR</option>
+            <option value="payroll">Payroll</option>
+            <option value="grants">Grants</option>
+            <option value="powerbi">Power BI</option>
+            <option value="banking">Banking</option>
+            <option value="crm">CRM</option>
+            <option value="file">File</option>
+          </select>
+        </label>
+        <label>Direction
+          <select name="direction">
+            <option value="inbound">Inbound</option>
+            <option value="outbound">Outbound</option>
+            <option value="bidirectional">Bidirectional</option>
+          </select>
+        </label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="importDialog">
+      <form id="importForm" method="dialog">
+        <h2>Import exported data</h2>
+        <p class="muted">Paste CSV or tab-delimited rows from Prophix or another exported source. Common column names are mapped automatically.</p>
+        <label>Source system <input name="source_system" required value="Prophix export" /></label>
+        <label>Connector <input name="connector_key" required value="external-export" /></label>
+        <label>Format
+          <select name="source_format">
+            <option value="csv">CSV</option>
+            <option value="xlsx">XLSX</option>
+          </select>
+        </label>
+        <label>Export rows
+          <textarea name="export_rows" rows="7" aria-label="Exported ledger rows">Department,Fund,Account,Period,Amount,Notes
+SCI,GEN,SUPPLIES,2026-08,-1250,Imported from exported planning system</textarea>
+        </label>
+        <p class="muted">Accepted ledger columns: department, fund, account, period, amount, notes. If the export has different headers, create a mapping template first.</p>
+        <label>Department <input name="department_code" required value="SCI" /></label>
+        <label>Fund <input name="fund_code" required value="GEN" /></label>
+        <label>Account <input name="account_code" required value="SUPPLIES" /></label>
+        <label>Period <input name="period" required value="2026-08" pattern="\d{4}-\d{2}" /></label>
+        <label>Amount <input name="amount" type="number" step="0.01" required value="-1250" /></label>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button id="previewImportSubmitButton" value="preview">Preview</button>
+          <button value="submit" class="primary">Import</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="guidedImportDialog">
+      <form id="guidedImportForm" method="dialog">
+        <h2>Guided import</h2>
+        <p class="muted">Paste exported rows. Keep the header row. CSV and tab-delimited text both work.</p>
+        <label>Where did this come from? <input name="source_system" required value="Prophix export" /></label>
+        <label>Connector key <input name="connector_key" required value="guided-export" /></label>
+        <label>Rows to import
+          <textarea name="export_rows" rows="8" aria-label="Guided exported rows">Department,Fund,Account,Period,Amount,Notes
+SCI,GEN,SUPPLIES,2026-08,-1250,Guided import row</textarea>
+        </label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Import rows</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="guidedExportDialog">
+      <form id="guidedExportForm" method="dialog">
+        <h2>Guided export</h2>
+        <p class="muted">Create an export package for the active scenario. Use this for BI, sharing, or handoff.</p>
+        <label>Dataset name <input name="dataset_name" required value="muFinances guided export" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Create export</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="excelRoundtripDialog">
+      <form id="excelRoundtripForm" method="dialog">
+        <h2>Import edited Excel template</h2>
+        <p class="muted">Paste the base64 workbook from an exported muFinances template. The LedgerInput sheet will be posted back to the planning ledger.</p>
+        <label>Workbook key <input name="workbook_key" value="uploaded-workbook" /></label>
+        <label>Workbook base64 <textarea name="workbook_base64" rows="8" required aria-label="Excel workbook base64"></textarea></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Import workbook</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="mappingTemplateDialog">
+      <form id="mappingTemplateForm" method="dialog">
+        <h2>Add mapping template</h2>
+        <label>Key <input name="template_key" required value="bank-cash-map" /></label>
+        <label>Connector <input name="connector_key" required value="bank-cash" /></label>
+        <label>Type
+          <select name="import_type">
+            <option value="ledger">Ledger</option>
+            <option value="banking_cash">Banking cash</option>
+            <option value="crm_enrollment">CRM enrollment</option>
+          </select>
+        </label>
+        <label>Source field <input name="source_field" required value="txn_amount" /></label>
+        <label>Target field <input name="target_field" required value="amount" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="validationRuleDialog">
+      <form id="validationRuleForm" method="dialog">
+        <h2>Add validation rule</h2>
+        <label>Key <input name="rule_key" required value="cash-amount-numeric" /></label>
+        <label>Type
+          <select name="import_type">
+            <option value="ledger">Ledger</option>
+            <option value="banking_cash">Banking cash</option>
+            <option value="crm_enrollment">CRM enrollment</option>
+          </select>
+        </label>
+        <label>Field <input name="field_name" required value="amount" /></label>
+        <label>Operator
+          <select name="operator">
+            <option value="required">Required</option>
+            <option value="numeric">Numeric</option>
+            <option value="period">Period</option>
+            <option value="date">Date</option>
+            <option value="in">In list</option>
+          </select>
+        </label>
+        <label>Expected <input name="expected_value" value="" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="credentialDialog">
+      <form id="credentialForm" method="dialog">
+        <h2>Store credential</h2>
+        <label>Connector <input name="connector_key" required value="erp-gl" /></label>
+        <label>Key <input name="credential_key" required value="api-token" /></label>
+        <label>Secret <input name="secret_value" required autocomplete="off" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Store</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="syncJobDialog">
+      <form id="syncJobForm" method="dialog">
+        <h2>Run sync job</h2>
+        <label>Connector <input name="connector_key" required value="erp-gl" /></label>
+        <label>Job
+          <select name="job_type">
+            <option value="erp_sync">ERP sync</option>
+            <option value="sis_sync">SIS sync</option>
+            <option value="hr_sync">HR sync</option>
+            <option value="payroll_sync">Payroll sync</option>
+            <option value="grants_sync">Grants sync</option>
+            <option value="validation">Validation</option>
+          </select>
+        </label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Run</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="powerBiExportDialog">
+      <form id="powerBiExportForm" method="dialog">
+        <h2>Create Power BI export</h2>
+        <label>Dataset <input name="dataset_name" required value="FY27 Operating Plan" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Create</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="opsCheckDialog">
+      <form id="opsCheckForm" method="dialog">
+        <h2>Run operational check</h2>
+        <label>Check
+          <select name="check_key">
+            <option value="database">Database</option>
+            <option value="static-assets">Static assets</option>
+            <option value="backups">Backups</option>
+            <option value="packaging">Packaging</option>
+          </select>
+        </label>
+        <label>Category
+          <select name="category">
+            <option value="health">Health</option>
+            <option value="deployment">Deployment</option>
+            <option value="backup">Backup</option>
+            <option value="restore">Restore</option>
+            <option value="security">Security</option>
+          </select>
+        </label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Run</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="restoreTestDialog">
+      <form id="restoreTestForm" method="dialog">
+        <h2>Run restore test</h2>
+        <label>Backup <select id="restoreBackupSelect" name="backup_key"></select></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Run</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="runbookDialog">
+      <form id="runbookForm" method="dialog">
+        <h2>Register runbook</h2>
+        <label>Key <input name="runbook_key" required value="deployment" /></label>
+        <label>Title <input name="title" required value="Deployment Runbook" /></label>
+        <label>Category
+          <select name="category">
+            <option value="deployment">Deployment</option>
+            <option value="backup">Backup</option>
+            <option value="restore">Restore</option>
+            <option value="security">Security</option>
+            <option value="operations">Operations</option>
+          </select>
+        </label>
+        <label>Path <input name="path" required value="docs/runbooks/deployment.md" /></label>
+        <label>Status
+          <select name="status">
+            <option value="ready">Ready</option>
+            <option value="draft">Draft</option>
+            <option value="needs_review">Needs review</option>
+          </select>
+        </label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="commentDialog">
+      <form id="commentForm" method="dialog">
+        <h2>Add comment</h2>
+        <label>Entity
+          <select name="entity_type">
+            <option value="close_task">Close task</option>
+            <option value="reconciliation">Reconciliation</option>
+            <option value="report">Report</option>
+            <option value="budget_line">Budget line</option>
+            <option value="ledger_entry">Ledger entry</option>
+            <option value="audit_packet">Audit packet</option>
+          </select>
+        </label>
+        <label>Entity ID <input name="entity_id" required value="1" /></label>
+        <label>Visibility
+          <select name="visibility">
+            <option value="internal">Internal</option>
+            <option value="audit">Audit</option>
+            <option value="executive">Executive</option>
+          </select>
+        </label>
+        <label>Comment <input name="comment_text" required value="Evidence reviewed." /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="attachmentDialog">
+      <form id="attachmentForm" method="dialog">
+        <h2>Add attachment metadata</h2>
+        <label>Entity
+          <select name="entity_type">
+            <option value="close_task">Close task</option>
+            <option value="reconciliation">Reconciliation</option>
+            <option value="report">Report</option>
+            <option value="budget_line">Budget line</option>
+            <option value="ledger_entry">Ledger entry</option>
+            <option value="audit_packet">Audit packet</option>
+          </select>
+        </label>
+        <label>Entity ID <input name="entity_id" required value="1" /></label>
+        <label>File name <input name="file_name" required value="evidence.pdf" /></label>
+        <label>Storage path <input name="storage_path" required value="evidence/evidence.pdf" /></label>
+        <label>Content type <input name="content_type" required value="application/pdf" /></label>
+        <label>Size bytes <input name="size_bytes" type="number" min="0" required value="2048" /></label>
+        <label>Retention until <input name="retention_until" value="2033-06-30" /></label>
+        <menu><button value="cancel">Cancel</button><button value="submit" class="primary">Save</button></menu>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+    <script src="/static/app.js?v=20260424-layout-distinct" type="module"></script>
+  <script type="module" src="/static/js/bootstrap.js?v=80"></script>
+  <script src="/static/js/workspace-button-fallback.js?v=89"></script>
+  <script src="/static/js/accessibility-pass.js?v=85"></script>
+  <script src="/static/js/production-readiness-dashboard.js?v=88"></script>
+  <script src="/static/js/dockable-sections.js?v=98"></script>
+  <script src="/static/js/layout-tightening.js?v=97"></script>
+  <script src="/static/js/chat-satellite.js?v=4"></script>
+</body>
+</html>

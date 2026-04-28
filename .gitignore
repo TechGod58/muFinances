@@ -1,0 +1,45 @@
+# Python and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments and local config
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Runtime databases, backups, exports, and logs
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+data/
+logs/
+*.log
+
+# Local generated review/import material
+.tmp_parallel_cubed_review/
+tmp/
+temp/
+
+# Secrets: keep examples only
+deploy/secrets/*
+!deploy/secrets/.gitignore
+!deploy/secrets/*.example
+
+# Node/browser artifacts
+node_modules/
+playwright-report/
+test-results/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

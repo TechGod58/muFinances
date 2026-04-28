@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>muFinances Chat</title>
+  <link rel="stylesheet" href="/static/styles.css?v=20260428-chat-gap">
+</head>
+<body class="chat-popup-page">
+  <main class="chat-popup-shell" aria-labelledby="chatWindowTitle">
+    <header class="chat-popup-header">
+      <div>
+        <p class="eyebrow">Direct message</p>
+        <h1 id="chatWindowTitle">muFinances Chat</h1>
+      </div>
+      <button id="chatWindowRefreshButton" type="button">Refresh</button>
+    </header>
+    <section class="chat-recipient-row" aria-label="Chat recipient">
+      <label for="chatWindowRecipientSelect">Send to</label>
+      <select id="chatWindowRecipientSelect"></select>
+    </section>
+    <section id="chatWindowMessages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
+      <p class="muted">Loading chat...</p>
+    </section>
+    <section class="chat-compose" aria-label="Send message">
+      <textarea id="chatWindowMessageInput" rows="4" maxlength="2000" aria-label="Chat message" placeholder="Type a message"></textarea>
+      <button id="chatWindowSendButton" class="primary" type="button">Send</button>
+    </section>
+    <p id="chatWindowStatus" class="muted" role="status" aria-live="polite"></p>
+  </main>
+  <script src="/static/js/chat-window.js?v=1"></script>
+</body>
+</html>

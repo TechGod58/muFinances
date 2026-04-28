@@ -1,0 +1,200 @@
+{
+  "meta": {
+    "id": "mufinances-parallel-cubed",
+    "version": "0.1",
+    "notes": "Finance-oriented Parallel Cubed wiring for muFinances capability flow"
+  },
+  "params": {
+    "max_active_regions": 4,
+    "spread": 0.62,
+    "risk_checkpoint_threshold": 0.35,
+    "risk_halt_threshold": 0.68
+  },
+  "regions": [
+    {
+      "id": "foundation",
+      "label": "Foundation Ledger"
+    },
+    {
+      "id": "planning",
+      "label": "Campus Planning"
+    },
+    {
+      "id": "drivers",
+      "label": "Forecast Drivers"
+    },
+    {
+      "id": "reporting",
+      "label": "Reporting Analytics"
+    },
+    {
+      "id": "close",
+      "label": "Close Consolidation"
+    },
+    {
+      "id": "integrations",
+      "label": "Integrations"
+    },
+    {
+      "id": "security",
+      "label": "Security Controls"
+    },
+    {
+      "id": "automation",
+      "label": "AI Automation"
+    },
+    {
+      "id": "experience",
+      "label": "User Experience"
+    },
+    {
+      "id": "operations",
+      "label": "Deployment Operations"
+    }
+  ],
+  "synapses": [
+    {
+      "src": "foundation",
+      "dst": "planning",
+      "w": 0.95
+    },
+    {
+      "src": "foundation",
+      "dst": "reporting",
+      "w": 0.9
+    },
+    {
+      "src": "foundation",
+      "dst": "close",
+      "w": 0.88
+    },
+    {
+      "src": "foundation",
+      "dst": "security",
+      "w": 0.82
+    },
+    {
+      "src": "planning",
+      "dst": "drivers",
+      "w": 0.9
+    },
+    {
+      "src": "planning",
+      "dst": "experience",
+      "w": 0.72
+    },
+    {
+      "src": "drivers",
+      "dst": "reporting",
+      "w": 0.8
+    },
+    {
+      "src": "drivers",
+      "dst": "automation",
+      "w": 0.7
+    },
+    {
+      "src": "reporting",
+      "dst": "experience",
+      "w": 0.78
+    },
+    {
+      "src": "close",
+      "dst": "reporting",
+      "w": 0.83
+    },
+    {
+      "src": "close",
+      "dst": "security",
+      "w": 0.76
+    },
+    {
+      "src": "integrations",
+      "dst": "foundation",
+      "w": 0.92
+    },
+    {
+      "src": "integrations",
+      "dst": "close",
+      "w": 0.72
+    },
+    {
+      "src": "security",
+      "dst": "operations",
+      "w": 0.74
+    },
+    {
+      "src": "automation",
+      "dst": "reporting",
+      "w": 0.68
+    },
+    {
+      "src": "operations",
+      "dst": "integrations",
+      "w": 0.62
+    }
+  ],
+  "bindings": {
+    "foundation": [
+      "planning_ledger",
+      "dimension_members",
+      "fiscal_periods",
+      "audit_logs"
+    ],
+    "planning": [
+      "budgeting",
+      "enrollment_planning",
+      "workforce_planning",
+      "grant_budgeting",
+      "capital_planning"
+    ],
+    "drivers": [
+      "driver_graph",
+      "forecast_engine",
+      "scenario_compare",
+      "predictive_forecast"
+    ],
+    "reporting": [
+      "summary_report",
+      "report_builder",
+      "dashboard_builder",
+      "narrative_reporting"
+    ],
+    "close": [
+      "account_reconciliation",
+      "intercompany_management",
+      "consolidation",
+      "close_checklist"
+    ],
+    "integrations": [
+      "connector_registry",
+      "file_import",
+      "power_bi_export",
+      "erp_sync"
+    ],
+    "security": [
+      "local_auth",
+      "role_permissions",
+      "row_level_security",
+      "sensitive_data_masking"
+    ],
+    "automation": [
+      "variance_assistant",
+      "anomaly_detection",
+      "budget_assistant",
+      "reconciliation_matching"
+    ],
+    "experience": [
+      "module_shell",
+      "planner_workspace",
+      "controller_workspace",
+      "executive_dashboard"
+    ],
+    "operations": [
+      "migration_runner",
+      "backup_restore",
+      "health_checks",
+      "deployment_packaging"
+    ]
+  }
+}

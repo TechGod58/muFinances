@@ -1,0 +1,3 @@
+-- B52 architecture modularization marker.
+-- Future schema changes should be added as focused fragments in this folder
+-- before they are connected to the runtime migration registry.

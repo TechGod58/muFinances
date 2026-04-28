@@ -1,0 +1,4 @@
+-- B52 rollback script.
+-- Architecture extraction rollback is operational: remove router includes and
+-- static module registration in the application build if a deployment rollback
+-- is required. No database objects were introduced by this migration.

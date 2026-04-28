@@ -1,0 +1,67 @@
+[
+  {
+    "name": "actual budget forecast scenario separation",
+    "ledger": [
+      {"basis": "actual", "account": "TUITION", "department": "SCI", "period": "2026-01", "amount": "1000.00"},
+      {"basis": "budget", "account": "TUITION", "department": "SCI", "period": "2026-01", "amount": "900.00"},
+      {"basis": "forecast", "account": "TUITION", "department": "SCI", "period": "2026-01", "amount": "950.00"},
+      {"basis": "scenario", "scenario": "growth", "account": "TUITION", "department": "SCI", "period": "2026-01", "amount": "1100.00"}
+    ],
+    "variance_basis": "budget",
+    "expected": {
+      "actual_total": "1000.00",
+      "budget_total": "900.00",
+      "forecast_total": "950.00",
+      "scenario_total": "1100.00",
+      "variance": "100.00",
+      "variance_percent": "11.11"
+    }
+  },
+  {
+    "name": "close reconciliation approvals",
+    "ledger": [
+      {"basis": "actual", "account": "SALARY", "department": "OPS", "period": "2026-02", "amount": "-500.00"}
+    ],
+    "reconciliation": {"ledger_total": "-500.00", "source_total": "-500.00", "tolerance": "0.01"},
+    "approvals": [
+      {"role": "preparer", "status": "approved"},
+      {"role": "reviewer", "status": "approved"}
+    ],
+    "required_approval_roles": ["preparer", "reviewer"],
+    "close_tasks": [
+      {"task": "reconcile salary", "status": "completed"},
+      {"task": "review packet", "status": "approved"}
+    ],
+    "expected": {
+      "actual_total": "-500.00",
+      "reconciled": true,
+      "approval_complete": true,
+      "close_ready": true
+    }
+  },
+  {
+    "name": "consolidation allocation variance",
+    "ledger": [
+      {"basis": "actual", "account": "SERVICE", "department": "OPS", "period": "2026-03", "amount": "1200.00"},
+      {"basis": "budget", "account": "SERVICE", "department": "OPS", "period": "2026-03", "amount": "1000.00"}
+    ],
+    "variance_basis": "budget",
+    "consolidation": {
+      "entity_totals": {"MAIN": "1000.00", "AUX": "250.00"},
+      "eliminations": [{"amount": "-100.00"}]
+    },
+    "allocation": {
+      "pool_amount": "1000.00",
+      "drivers": {"ART": "1", "SCI": "3"}
+    },
+    "expected": {
+      "actual_total": "1200.00",
+      "budget_total": "1000.00",
+      "variance": "200.00",
+      "variance_percent": "20.00",
+      "consolidation_net": "1150.00",
+      "allocation": {"ART": "250.00", "SCI": "750.00"}
+    }
+  }
+]
+
