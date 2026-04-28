@@ -1419,6 +1419,29 @@ class SupportIssueReportCreate(BaseModel):
     detail: dict[str, Any] = Field(default_factory=dict)
 
 
+class PilotDeploymentRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    release_version: str = Field(default='B110.pilot', min_length=1, max_length=80)
+    internal_server_url: str | None = Field(default=None, max_length=240)
+    database_backend: Literal['sqlite', 'postgres', 'mssql'] = 'mssql'
+    selected_users: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ParityGapReviewRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    pilot_run_id: int | None = None
+
+
+class ProductionReleaseCandidateRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    release_version: str = Field(default='B112.rc1', min_length=1, max_length=80)
+    pilot_run_id: int | None = None
+    parity_run_id: int | None = None
+    finance_signoff_by: str | None = Field(default=None, max_length=160)
+    it_signoff_by: str | None = Field(default=None, max_length=160)
+    allow_known_vendor_ecosystem_gap: bool = True
+
+
 class ModelScenarioBranchCreate(BaseModel):
     source_scenario_id: int | None = None
     branch_key: str | None = Field(default=None, max_length=120)

@@ -126,6 +126,7 @@ from app.schemas import (
     OperationsAlertRouteCreate,
     OperationsReadinessRunCreate,
     ParallelCubedOptimizationRunCreate,
+    ParityGapReviewRunCreate,
     PermissionSimulationCreate,
     OfficeCellCommentCreate,
     PeriodCloseCalendarCreate,
@@ -137,7 +138,9 @@ from app.schemas import (
     PerformanceLoadTestCreate,
     PlanLineItemCreate,
     PlanLineItemOut,
+    PilotDeploymentRunCreate,
     ProductionDataCutoverRunCreate,
+    ProductionReleaseCandidateRunCreate,
     CampusDataValidationRunCreate,
     RealConnectorActivationRunCreate,
     ExportArtifactCreate,
@@ -864,6 +867,24 @@ from app.services.supportability_admin import (
     simulate_permission as simulate_support_permission,
     status as supportability_status,
 )
+from app.services.pilot_deployment import (
+    get_run as get_pilot_deployment_run,
+    list_runs as list_pilot_deployment_runs,
+    run_pilot_deployment,
+    status as pilot_deployment_status,
+)
+from app.services.parity_gap_review import (
+    get_run as get_parity_gap_review_run,
+    list_runs as list_parity_gap_review_runs,
+    run_parity_review,
+    status as parity_gap_review_status,
+)
+from app.services.production_release_candidate import (
+    get_run as get_production_release_candidate_run,
+    list_runs as list_production_release_candidate_runs,
+    run_release_candidate,
+    status as production_release_candidate_status,
+)
 from app.services.observability_operations import (
     acknowledge_alert as acknowledge_observability_alert,
     list_alerts as list_observability_alerts,
@@ -1414,6 +1435,99 @@ def supportability_failed_job_replay_endpoint(job_id: int, payload: FailedJobRep
 def supportability_create_issue_endpoint(payload: SupportIssueReportCreate, request: Request) -> dict[str, Any]:
     _require(request, 'operations.manage')
     return create_support_issue_report(payload.model_dump(), request.state.user)
+
+
+@app.get('/api/pilot-deployment/status')
+def pilot_deployment_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return pilot_deployment_status()
+
+
+@app.get('/api/pilot-deployment/runs')
+def pilot_deployment_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_pilot_deployment_runs(limit)
+    return {'count': len(rows), 'pilot_runs': rows}
+
+
+@app.get('/api/pilot-deployment/runs/{run_id}')
+def pilot_deployment_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_pilot_deployment_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/pilot-deployment/run')
+def pilot_deployment_run_create_endpoint(payload: PilotDeploymentRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_pilot_deployment(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/parity-gap-review/status')
+def parity_gap_review_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return parity_gap_review_status()
+
+
+@app.get('/api/parity-gap-review/runs')
+def parity_gap_review_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_parity_gap_review_runs(limit)
+    return {'count': len(rows), 'parity_reviews': rows}
+
+
+@app.get('/api/parity-gap-review/runs/{run_id}')
+def parity_gap_review_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_parity_gap_review_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/parity-gap-review/run')
+def parity_gap_review_run_create_endpoint(payload: ParityGapReviewRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_parity_review(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/production-release-candidate/status')
+def production_release_candidate_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return production_release_candidate_status()
+
+
+@app.get('/api/production-release-candidate/runs')
+def production_release_candidate_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_production_release_candidate_runs(limit)
+    return {'count': len(rows), 'release_candidates': rows}
+
+
+@app.get('/api/production-release-candidate/runs/{run_id}')
+def production_release_candidate_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_production_release_candidate_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/production-release-candidate/run')
+def production_release_candidate_run_create_endpoint(payload: ProductionReleaseCandidateRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_release_candidate(payload.model_dump(), request.state.user, getattr(request.state, 'trace_id', ''))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.get('/api/compliance/status')
