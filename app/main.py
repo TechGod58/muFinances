@@ -51,6 +51,7 @@ from app.schemas import (
     CollaborationHardeningRunCreate,
     CollaborationTaskNotificationCreate,
     DisasterRecoveryReleaseRunCreate,
+    DocumentationLockRunCreate,
     AccountReconciliationCreate,
     CloseChecklistComplete,
     CloseChecklistCreate,
@@ -63,6 +64,7 @@ from app.schemas import (
     ConsolidationSettingCreate,
     ConnectorCreate,
     ConnectorAuthFlowCreate,
+    ConnectorTestModeCreate,
     ConfigSnapshotCreate,
     CredentialVaultCreate,
     CurrencyRateCreate,
@@ -124,6 +126,7 @@ from app.schemas import (
     OperationsAlertRouteCreate,
     OperationsReadinessRunCreate,
     ParallelCubedOptimizationRunCreate,
+    PermissionSimulationCreate,
     OfficeCellCommentCreate,
     PeriodCloseCalendarCreate,
     PeriodLockAction,
@@ -168,6 +171,10 @@ from app.schemas import (
     SummaryReport,
     SSOProductionSettingCreate,
     SoDPolicyCreate,
+    SupportabilityRunCreate,
+    SupportBundleCreate,
+    SupportIssueReportCreate,
+    FailedJobReplayCreate,
     ForecastRunCreate,
     PredictiveModelChoiceCreate,
     ReportDefinitionCreate,
@@ -839,6 +846,24 @@ from app.services.user_acceptance_testing import (
     run_uat as run_user_acceptance_testing,
     status as user_acceptance_testing_status,
 )
+from app.services.documentation_lock import (
+    get_run as get_documentation_lock_run,
+    list_runs as list_documentation_lock_runs,
+    run_lock as run_documentation_lock,
+    status as documentation_lock_status,
+)
+from app.services.supportability_admin import (
+    create_issue_report as create_support_issue_report,
+    create_support_bundle,
+    diagnose_user_session as diagnose_support_user_session,
+    get_run as get_supportability_run,
+    list_runs as list_supportability_runs,
+    replay_failed_job as replay_support_failed_job,
+    run_connector_test_mode as run_support_connector_test_mode,
+    run_supportability,
+    simulate_permission as simulate_support_permission,
+    status as supportability_status,
+)
 from app.services.observability_operations import (
     acknowledge_alert as acknowledge_observability_alert,
     list_alerts as list_observability_alerts,
@@ -1279,6 +1304,116 @@ def user_acceptance_testing_run_create_endpoint(payload: UserAcceptanceTestRunCr
         return run_user_acceptance_testing(payload.model_dump(), request.state.user)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/documentation-lock/status')
+def documentation_lock_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return documentation_lock_status()
+
+
+@app.get('/api/documentation-lock/runs')
+def documentation_lock_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_documentation_lock_runs(limit)
+    return {'count': len(rows), 'documentation_locks': rows}
+
+
+@app.get('/api/documentation-lock/runs/{run_id}')
+def documentation_lock_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_documentation_lock_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/documentation-lock/run')
+def documentation_lock_run_create_endpoint(payload: DocumentationLockRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_documentation_lock(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/supportability/status')
+def supportability_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return supportability_status()
+
+
+@app.get('/api/supportability/runs')
+def supportability_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_supportability_runs(limit)
+    return {'count': len(rows), 'supportability_runs': rows}
+
+
+@app.get('/api/supportability/runs/{run_id}')
+def supportability_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_supportability_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/supportability/run')
+def supportability_run_create_endpoint(payload: SupportabilityRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_supportability(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post('/api/supportability/bundles')
+def supportability_create_bundle_endpoint(payload: SupportBundleCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return create_support_bundle(payload.model_dump(), request.state.user)
+
+
+@app.get('/api/supportability/users/{user_id}/sessions')
+def supportability_user_session_diagnostics_endpoint(user_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return diagnose_support_user_session(user_id, request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/supportability/permissions/simulate')
+def supportability_permission_simulation_endpoint(payload: PermissionSimulationCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return simulate_support_permission(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/supportability/connectors/test-mode')
+def supportability_connector_test_mode_endpoint(payload: ConnectorTestModeCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_support_connector_test_mode(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/supportability/jobs/{job_id}/replay')
+def supportability_failed_job_replay_endpoint(job_id: int, payload: FailedJobReplayCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return replay_support_failed_job(job_id, payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/supportability/issues')
+def supportability_create_issue_endpoint(payload: SupportIssueReportCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return create_support_issue_report(payload.model_dump(), request.state.user)
 
 
 @app.get('/api/compliance/status')

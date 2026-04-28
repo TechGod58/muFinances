@@ -1378,6 +1378,47 @@ class ParallelCubedOptimizationRunCreate(BaseModel):
     max_workers: int | None = Field(default=None, ge=1, le=64)
 
 
+class DocumentationLockRunCreate(BaseModel):
+    lock_key: str | None = Field(default=None, max_length=120)
+
+
+class SupportabilityRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+
+
+class SupportBundleCreate(BaseModel):
+    bundle_key: str | None = Field(default=None, max_length=120)
+    replay_id: str | None = Field(default=None, max_length=160)
+
+
+class PermissionSimulationCreate(BaseModel):
+    simulation_key: str | None = Field(default=None, max_length=160)
+    user_id: int
+    permission_key: str = Field(min_length=1, max_length=120)
+
+
+class ConnectorTestModeCreate(BaseModel):
+    test_key: str | None = Field(default=None, max_length=160)
+    connector_key: str = Field(min_length=1, max_length=120)
+    name: str | None = Field(default=None, max_length=160)
+    system_type: Literal['erp', 'sis', 'hr', 'payroll', 'grants', 'banking', 'brokerage', 'file'] = 'file'
+    adapter_key: str = Field(default='erp_gl', max_length=120)
+
+
+class FailedJobReplayCreate(BaseModel):
+    replay_key: str | None = Field(default=None, max_length=160)
+    replay_id: str | None = Field(default=None, max_length=160)
+    job_type: str | None = Field(default=None, max_length=120)
+
+
+class SupportIssueReportCreate(BaseModel):
+    issue_key: str | None = Field(default=None, max_length=160)
+    title: str = Field(min_length=1, max_length=240)
+    severity: Literal['low', 'medium', 'high', 'critical'] = 'medium'
+    replay_id: str | None = Field(default=None, max_length=160)
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+
 class ModelScenarioBranchCreate(BaseModel):
     source_scenario_id: int | None = None
     branch_key: str | None = Field(default=None, max_length=120)
