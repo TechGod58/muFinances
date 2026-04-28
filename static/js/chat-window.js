@@ -55,6 +55,20 @@
     if (status) status.textContent = message || '';
   }
 
+  function presenceLabel(user) {
+    const presence = user?.presence || {};
+    if (presence.status === 'online') return 'online';
+    if (presence.last_seen_at) return `last seen ${new Date(presence.last_seen_at).toLocaleString()}`;
+    return 'offline';
+  }
+
+  function deliveryLabel(message) {
+    if (message.direction !== 'sent') return '';
+    if (message.delivery_status === 'pending_delivery') return 'Queued until recipient signs in';
+    if (message.delivery_status === 'delivered') return 'Delivered';
+    return message.delivery_status || '';
+  }
+
   function renderMessages(messages) {
     const container = $('#chatWindowMessages');
     if (!container) return;
@@ -64,11 +78,13 @@
     }
     container.innerHTML = messages.map((message) => {
       const name = message.direction === 'sent' ? 'You' : (message.sender_name || message.sender_email || 'User');
+      const delivery = deliveryLabel(message);
       return `
         <article class="chat-message ${message.direction}">
           <strong>${escapeHtml(name)}</strong>
           <span>${escapeHtml(message.body)}</span>
           <time datetime="${escapeHtml(message.sent_at)}">${escapeHtml(new Date(message.sent_at).toLocaleString())}</time>
+          ${delivery ? `<small class="chat-delivery">${escapeHtml(delivery)}</small>` : ''}
         </article>
       `;
     }).join('');
@@ -87,7 +103,7 @@
     select.innerHTML = state.users.length
       ? state.users.map((user) => {
         const unread = user.unread_count ? ` (${user.unread_count} unread)` : '';
-        return `<option value="${user.id}">${escapeHtml(user.display_name || user.email)}${unread}</option>`;
+        return `<option value="${user.id}">${escapeHtml(user.display_name || user.email)} - ${escapeHtml(presenceLabel(user))}${unread}</option>`;
       }).join('')
       : '<option value="">No other users available</option>';
     select.disabled = state.users.length === 0;

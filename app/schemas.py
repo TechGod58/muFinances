@@ -1330,6 +1330,26 @@ class AIProductionGuardrailRunCreate(BaseModel):
     scenario_id: int | None = None
 
 
+class UXFinancePolishRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    scenario_id: int | None = None
+
+
+class CollaborationHardeningRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    scenario_id: int | None = None
+
+
+class CollaborationTaskNotificationCreate(BaseModel):
+    task_key: str = Field(min_length=1, max_length=160)
+    recipient_user_id: int
+    scenario_id: int | None = None
+    title: str = Field(min_length=1, max_length=160)
+    message: str = Field(min_length=1, max_length=500)
+    severity: Literal['info', 'warning', 'error', 'success'] = 'info'
+    link: str = Field(default='#workflow', max_length=240)
+
+
 class ModelScenarioBranchCreate(BaseModel):
     source_scenario_id: int | None = None
     branch_key: str | None = Field(default=None, max_length=120)

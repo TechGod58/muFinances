@@ -72,12 +72,15 @@ def test_direct_chat_creates_unread_message_and_notification() -> None:
     assert sent.status_code == 200
     assert sent.json()['direction'] == 'sent'
     assert sent.json()['notification_id']
+    assert sent.json()['delivery_status'] == 'pending_delivery'
 
     recipient_headers = planner_headers()
     summary = client.get('/api/chat/summary', headers=recipient_headers)
     assert summary.status_code == 200
     assert summary.json()['unread_count'] == 1
     assert summary.json()['latest_unread']['body'] == 'Budget review is ready.'
+    assert summary.json()['latest_unread']['delivery_status'] == 'delivered'
+    assert summary.json()['delivered_on_open']['delivered_count'] == 1
 
     notifications = client.get('/api/ux/notifications', headers=recipient_headers)
     assert notifications.status_code == 200
@@ -99,6 +102,7 @@ def test_chat_ui_assets_are_registered() -> None:
     index = (PROJECT_ROOT / 'static' / 'index.html').read_text(encoding='utf-8')
     assert 'id="chatButton"' in index
     assert 'id="chatSatellite"' in index
-    assert '/static/js/chat-satellite.js?v=4' in index
+    assert '/static/js/chat-satellite.js?v=5' in index
+    assert 'chat-delivery' in (PROJECT_ROOT / 'static' / 'styles.css').read_text(encoding='utf-8')
     assert (PROJECT_ROOT / 'static' / 'chat-window.html').exists()
     assert (PROJECT_ROOT / 'static' / 'js' / 'chat-window.js').exists()

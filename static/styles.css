@@ -719,6 +719,11 @@ menu {
   font-size: 0.76rem;
 }
 
+.chat-delivery {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
 .chat-compose {
   align-items: stretch;
 }

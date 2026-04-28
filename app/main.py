@@ -48,6 +48,8 @@ from app.schemas import (
     ChartRenderCreate,
     ChatMessageCreate,
     ChatReadRequest,
+    CollaborationHardeningRunCreate,
+    CollaborationTaskNotificationCreate,
     AccountReconciliationCreate,
     CloseChecklistComplete,
     CloseChecklistCreate,
@@ -188,6 +190,7 @@ from app.schemas import (
     UserAccessReviewDecision,
     UserDimensionAccessCreate,
     UserProfileUpdate,
+    UXFinancePolishRunCreate,
     WorkforcePositionCreate,
     WorkflowAdvance,
     WorkflowCertificationPacketCreate,
@@ -623,10 +626,24 @@ from app.services.ux_productivity import (
 )
 from app.services.chat import (
     chat_summary,
+    create_task_notification as create_collaboration_task_notification,
     list_chat_users,
+    list_mentions as list_collaboration_mentions,
     list_messages as list_chat_messages,
+    list_task_notifications as list_collaboration_task_notifications,
     mark_messages_read,
+    presence_summary as chat_presence_summary,
     send_message,
+)
+from app.services.ux_finance_user_polish import (
+    list_runs as list_ux_finance_polish_runs,
+    run_polish as run_ux_finance_polish,
+    status as ux_finance_polish_status,
+)
+from app.services.collaboration_layer_hardening import (
+    list_runs as list_collaboration_hardening_runs,
+    run_hardening as run_collaboration_hardening,
+    status as collaboration_hardening_status,
 )
 from app.services.accessibility_testing import status as accessibility_testing_status
 from app.services.production_operations import (
@@ -1611,6 +1628,28 @@ def ux_notifications(request: Request, scenario_id: int | None = Query(None, ge=
     return {'scenario_id': scenario_id, 'count': len(rows), 'notifications': rows}
 
 
+@app.get('/api/ux/finance-polish/status')
+def ux_finance_polish_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'workspaces.view')
+    return ux_finance_polish_status()
+
+
+@app.get('/api/ux/finance-polish/runs')
+def ux_finance_polish_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'workspaces.view')
+    rows = list_ux_finance_polish_runs(limit)
+    return {'count': len(rows), 'polish_runs': rows}
+
+
+@app.post('/api/ux/finance-polish/run')
+def ux_finance_polish_run_endpoint(payload: UXFinancePolishRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'workspaces.view')
+    try:
+        return run_ux_finance_polish(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.post('/api/ux/notifications')
 def ux_create_notification(payload: NotificationCreate, request: Request) -> dict[str, Any]:
     _require(request, 'reports.read')
@@ -1634,6 +1673,54 @@ def chat_users(request: Request) -> dict[str, Any]:
 @app.get('/api/chat/summary')
 def chat_unread_summary(request: Request) -> dict[str, Any]:
     return chat_summary(request.state.user)
+
+
+@app.get('/api/chat/presence')
+def chat_presence(request: Request) -> dict[str, Any]:
+    return chat_presence_summary(request.state.user)
+
+
+@app.get('/api/chat/mentions')
+def chat_mentions(request: Request) -> dict[str, Any]:
+    rows = list_collaboration_mentions(request.state.user)
+    return {'count': len(rows), 'mentions': rows}
+
+
+@app.get('/api/chat/task-notifications')
+def chat_task_notifications(request: Request, status: str | None = Query(None)) -> dict[str, Any]:
+    rows = list_collaboration_task_notifications(request.state.user, status)
+    return {'status': status, 'count': len(rows), 'task_notifications': rows}
+
+
+@app.post('/api/chat/task-notifications')
+def chat_create_task_notification(payload: CollaborationTaskNotificationCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'workflow.manage')
+    try:
+        return create_collaboration_task_notification(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get('/api/collaboration/hardening/status')
+def collaboration_hardening_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'workspaces.view')
+    return collaboration_hardening_status()
+
+
+@app.get('/api/collaboration/hardening/runs')
+def collaboration_hardening_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'workspaces.view')
+    rows = list_collaboration_hardening_runs(limit)
+    return {'count': len(rows), 'hardening_runs': rows}
+
+
+@app.post('/api/collaboration/hardening/run')
+def collaboration_hardening_run_endpoint(payload: CollaborationHardeningRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'workspaces.view')
+    try:
+        return run_collaboration_hardening(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.get('/api/chat/messages')
