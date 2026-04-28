@@ -23,10 +23,12 @@ from app.schemas import (
     AIExplanationDecision,
     AIPlanningAgentDecision,
     AIPlanningAgentRunCreate,
+    AIProductionGuardrailRunCreate,
     AdminImpersonationCreate,
     AutomationDecisionCreate,
     AutomationRunCreate,
     ApplicationLogCreate,
+    AuditComplianceCertificationRunCreate,
     BackgroundJobCreate,
     ComplianceCertificationCreate,
     ComplianceCertificationDecision,
@@ -526,6 +528,11 @@ from app.services.governed_automation import (
     run_assistant,
     status as governed_automation_status,
 )
+from app.services.ai_production_guardrails import (
+    list_runs as list_ai_production_guardrail_runs,
+    run_certification as run_ai_production_guardrails,
+    status as ai_production_guardrails_status,
+)
 from app.services.ai_explainability import (
     approve_explanation as approve_ai_explanation,
     draft_variance_explanations as draft_ai_variance_explanations,
@@ -643,6 +650,11 @@ from app.services.compliance import (
     status as compliance_status,
     upsert_retention_policy,
     verify_audit_chain,
+)
+from app.services.audit_compliance_certification import (
+    list_runs as list_audit_compliance_certification_runs,
+    run_certification as run_audit_compliance_certification,
+    status as audit_compliance_certification_status,
 )
 from app.services.tax_compliance import (
     classify_activity as classify_tax_activity,
@@ -1132,6 +1144,28 @@ def observability_backup_restore_drills_endpoint(request: Request, limit: int = 
 def compliance_status_endpoint(request: Request) -> dict[str, Any]:
     _require(request, 'operations.manage')
     return compliance_status()
+
+
+@app.get('/api/compliance/audit-certification/status')
+def compliance_audit_certification_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return audit_compliance_certification_status()
+
+
+@app.get('/api/compliance/audit-certification/runs')
+def compliance_audit_certification_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_audit_compliance_certification_runs(limit)
+    return {'count': len(rows), 'certification_runs': rows}
+
+
+@app.post('/api/compliance/audit-certification/run')
+def compliance_audit_certification_run_endpoint(payload: AuditComplianceCertificationRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_audit_compliance_certification(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.post('/api/compliance/audit/seal')
@@ -4707,6 +4741,28 @@ def automation_planning_agents_status_endpoint(request: Request) -> dict[str, An
 def automation_ai_guardrails_status_endpoint(request: Request) -> dict[str, Any]:
     _require(request, 'automation.manage')
     return ai_guardrails_status()
+
+
+@app.get('/api/automation/ai-production-guardrails/status')
+def automation_ai_production_guardrails_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'automation.manage')
+    return ai_production_guardrails_status()
+
+
+@app.get('/api/automation/ai-production-guardrails/runs')
+def automation_ai_production_guardrail_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'automation.manage')
+    rows = list_ai_production_guardrail_runs(limit)
+    return {'count': len(rows), 'guardrail_runs': rows}
+
+
+@app.post('/api/automation/ai-production-guardrails/run')
+def automation_ai_production_guardrails_run_endpoint(payload: AIProductionGuardrailRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'automation.manage')
+    try:
+        return run_ai_production_guardrails(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.post('/api/automation/ai-guardrails/run')

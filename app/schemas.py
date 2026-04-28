@@ -1320,6 +1320,16 @@ class SecurityActivationCertificationRunCreate(BaseModel):
     run_key: str | None = Field(default=None, max_length=120)
 
 
+class AuditComplianceCertificationRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    scenario_id: int | None = None
+
+
+class AIProductionGuardrailRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    scenario_id: int | None = None
+
+
 class ModelScenarioBranchCreate(BaseModel):
     source_scenario_id: int | None = None
     branch_key: str | None = Field(default=None, max_length=120)
