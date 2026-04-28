@@ -84,7 +84,10 @@
 
   async function fetchDashboard() {
     try {
-      const response = await fetch('/api/admin/production-readiness-dashboard', { headers: { Accept: 'application/json' } });
+      const token = localStorage.getItem('mufinances.token') || '';
+      const headers = { Accept: 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const response = await fetch('/api/admin/production-readiness-dashboard', { headers });
       if (response.ok) return await response.json();
     } catch {
       // Fall back to local dashboard.

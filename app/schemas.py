@@ -1350,6 +1350,23 @@ class CollaborationTaskNotificationCreate(BaseModel):
     link: str = Field(default='#workflow', max_length=240)
 
 
+class OperationsReadinessRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+
+
+class OperationsAlertRouteCreate(BaseModel):
+    route_key: str = Field(min_length=1, max_length=120)
+    severity: Literal['info', 'warning', 'error', 'critical'] = 'warning'
+    destination: str = Field(min_length=1, max_length=240)
+    status: Literal['ready', 'disabled', 'needs_review'] = 'ready'
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class DisasterRecoveryReleaseRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    release_version: str = Field(default='B106.0', min_length=1, max_length=80)
+
+
 class ModelScenarioBranchCreate(BaseModel):
     source_scenario_id: int | None = None
     branch_key: str | None = Field(default=None, max_length=120)

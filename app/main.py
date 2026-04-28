@@ -50,6 +50,7 @@ from app.schemas import (
     ChatReadRequest,
     CollaborationHardeningRunCreate,
     CollaborationTaskNotificationCreate,
+    DisasterRecoveryReleaseRunCreate,
     AccountReconciliationCreate,
     CloseChecklistComplete,
     CloseChecklistCreate,
@@ -120,6 +121,8 @@ from app.schemas import (
     ModelScenarioBranchCreate,
     OperatingBudgetLineCreate,
     OperationalCheckCreate,
+    OperationsAlertRouteCreate,
+    OperationsReadinessRunCreate,
     OfficeCellCommentCreate,
     PeriodCloseCalendarCreate,
     PeriodLockAction,
@@ -834,6 +837,19 @@ from app.services.observability_operations import (
     status as observability_status,
     workspace as observability_workspace,
 )
+from app.services.operations_readiness import (
+    list_alert_routes as list_operations_alert_routes,
+    list_runs as list_operations_readiness_runs,
+    production_readiness_dashboard,
+    run_readiness as run_operations_readiness,
+    status as operations_readiness_status,
+    upsert_alert_route as upsert_operations_alert_route,
+)
+from app.services.disaster_recovery_release_governance import (
+    list_runs as list_disaster_recovery_release_runs,
+    run_governance as run_disaster_recovery_release_governance,
+    status as disaster_recovery_release_governance_status,
+)
 from app.services.ledger_depth import (
     approve_journal_adjustment,
     approve_scenario,
@@ -1155,6 +1171,69 @@ def observability_backup_restore_drills_endpoint(request: Request, limit: int = 
     _require(request, 'operations.manage')
     rows = list_observability_backup_restore_drills(limit)
     return {'count': len(rows), 'backup_restore_drills': rows}
+
+
+@app.get('/api/admin/production-readiness-dashboard')
+def admin_production_readiness_dashboard_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return production_readiness_dashboard()
+
+
+@app.get('/api/operations-readiness/status')
+def operations_readiness_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return operations_readiness_status()
+
+
+@app.get('/api/operations-readiness/runs')
+def operations_readiness_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_operations_readiness_runs(limit)
+    return {'count': len(rows), 'readiness_runs': rows}
+
+
+@app.post('/api/operations-readiness/run')
+def operations_readiness_run_endpoint(payload: OperationsReadinessRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_operations_readiness(payload.model_dump(), request.state.user, getattr(request.state, 'trace_id', ''))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/operations-readiness/alert-routes')
+def operations_readiness_alert_routes_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_operations_alert_routes()
+    return {'count': len(rows), 'alert_routes': rows}
+
+
+@app.post('/api/operations-readiness/alert-routes')
+def operations_readiness_upsert_alert_route_endpoint(payload: OperationsAlertRouteCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return upsert_operations_alert_route(payload.model_dump(), request.state.user)
+
+
+@app.get('/api/disaster-recovery-release/status')
+def disaster_recovery_release_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return disaster_recovery_release_governance_status()
+
+
+@app.get('/api/disaster-recovery-release/runs')
+def disaster_recovery_release_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_disaster_recovery_release_runs(limit)
+    return {'count': len(rows), 'governance_runs': rows}
+
+
+@app.post('/api/disaster-recovery-release/run')
+def disaster_recovery_release_run_endpoint(payload: DisasterRecoveryReleaseRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_disaster_recovery_release_governance(payload.model_dump(), request.state.user, getattr(request.state, 'trace_id', ''))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.get('/api/compliance/status')
