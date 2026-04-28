@@ -51,6 +51,7 @@ from app.schemas import (
     CloseChecklistCreate,
     CloseTaskDependencyCreate,
     CloseTaskTemplateCreate,
+    ConsolidationCertificationRunCreate,
     ConsolidationRunCreate,
     ConsolidationRuleCreate,
     ConsolidationEntityCreate,
@@ -127,6 +128,7 @@ from app.schemas import (
     PlanLineItemOut,
     ProductionDataCutoverRunCreate,
     CampusDataValidationRunCreate,
+    RealConnectorActivationRunCreate,
     ExportArtifactCreate,
     NarrativeDecisionCreate,
     NarrativeDraftCreate,
@@ -142,6 +144,8 @@ from app.schemas import (
     ReportBurstRuleCreate,
     ReportChartCreate,
     ReportLayoutCreate,
+    ReportingPixelPolishRunCreate,
+    SecurityActivationCertificationRunCreate,
     VarianceExplanationCreate,
     VarianceThresholdCreate,
     ScenarioCreate,
@@ -365,10 +369,20 @@ from app.services.fpa_workflow_certification import (
     run_certification as run_fpa_workflow_certification,
     status as fpa_workflow_certification_status,
 )
+from app.services.consolidation_certification import (
+    list_runs as list_consolidation_certification_runs,
+    run_certification as run_consolidation_certification,
+    status as consolidation_certification_status,
+)
 from app.services.forecasting_accuracy_proof import (
     list_runs as list_forecasting_accuracy_proof_runs,
     run_proof as run_forecasting_accuracy_proof,
     status as forecasting_accuracy_proof_status,
+)
+from app.services.reporting_pixel_polish_certification import (
+    list_runs as list_reporting_pixel_polish_runs,
+    run_certification as run_reporting_pixel_polish,
+    status as reporting_pixel_polish_status,
 )
 from app.services.profitability import (
     before_after_allocation_comparison,
@@ -490,6 +504,11 @@ from app.services.campus_integrations import (
     upsert_mapping_template,
     upsert_validation_rule,
     validate_source_drillback,
+)
+from app.services.real_connector_activation import (
+    list_runs as list_real_connector_activation_runs,
+    run_activation as run_real_connector_activation,
+    status as real_connector_activation_status,
 )
 from app.services.governed_automation import (
     ai_guardrails_status,
@@ -868,6 +887,11 @@ from app.services.security import (
     upsert_sod_policy,
     upsert_sso_production_setting,
     user_from_token,
+)
+from app.services.security_activation_certification import (
+    list_runs as list_security_activation_certification_runs,
+    run_certification as run_security_activation_certification,
+    status as security_activation_certification_status,
 )
 from app.services.access_guard import (
     access_guard_status,
@@ -1658,6 +1682,25 @@ def security_enterprise_workspace_endpoint(request: Request) -> dict[str, Any]:
 def security_activation_run_endpoint(request: Request) -> dict[str, Any]:
     _require(request, 'security.manage')
     return activate_security_controls(request.state.user)
+
+
+@app.get('/api/security/activation-certification/status')
+def security_activation_certification_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'security.manage')
+    return security_activation_certification_status()
+
+
+@app.get('/api/security/activation-certification/runs')
+def security_activation_certification_runs_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'security.manage')
+    rows = list_security_activation_certification_runs()
+    return {'count': len(rows), 'activation_certification_runs': rows}
+
+
+@app.post('/api/security/activation-certification/run')
+def security_activation_certification_run_endpoint(payload: SecurityActivationCertificationRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'security.manage')
+    return run_security_activation_certification(payload.model_dump(), request.state.user)
 
 
 @app.get('/api/security/access-guard/status')
@@ -2582,6 +2625,28 @@ def fpa_workflow_certification_run_endpoint(payload: FPAWorkflowCertificationRun
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@app.get('/api/reporting/pixel-polish-certification/status')
+def reporting_pixel_polish_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'reporting.manage')
+    return reporting_pixel_polish_status()
+
+
+@app.get('/api/reporting/pixel-polish-certification/runs')
+def reporting_pixel_polish_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'reporting.manage')
+    rows = list_reporting_pixel_polish_runs(limit)
+    return {'count': len(rows), 'certification_runs': rows}
+
+
+@app.post('/api/reporting/pixel-polish-certification/run')
+def reporting_pixel_polish_run_endpoint(payload: ReportingPixelPolishRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'reporting.manage')
+    try:
+        return run_reporting_pixel_polish(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.get('/api/reporting/designer-distribution/status')
 def reporting_designer_distribution_status(request: Request) -> dict[str, Any]:
     _require(request, 'reporting.manage')
@@ -3369,6 +3434,28 @@ def close_certification_run_endpoint(payload: FinancialCloseCertificationRunCrea
     _require(request, 'close.manage')
     try:
         return run_financial_close_certification(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/close/consolidation-certification/status')
+def close_consolidation_certification_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'close.manage')
+    return consolidation_certification_status()
+
+
+@app.get('/api/close/consolidation-certification/runs')
+def close_consolidation_certification_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'close.manage')
+    rows = list_consolidation_certification_runs(limit)
+    return {'count': len(rows), 'certification_runs': rows}
+
+
+@app.post('/api/close/consolidation-certification/run')
+def close_consolidation_certification_run_endpoint(payload: ConsolidationCertificationRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'close.manage')
+    try:
+        return run_consolidation_certification(payload.model_dump(), request.state.user)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -4166,6 +4253,28 @@ def integrations_marketplace_status_endpoint(request: Request) -> dict[str, Any]
 def integrations_production_status_endpoint(request: Request) -> dict[str, Any]:
     _require(request, 'integrations.manage')
     return connector_production_status()
+
+
+@app.get('/api/integrations/real-connector-activation/status')
+def integrations_real_connector_activation_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'integrations.manage')
+    return real_connector_activation_status()
+
+
+@app.get('/api/integrations/real-connector-activation/runs')
+def integrations_real_connector_activation_runs_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'integrations.manage')
+    rows = list_real_connector_activation_runs()
+    return {'count': len(rows), 'activation_runs': rows}
+
+
+@app.post('/api/integrations/real-connector-activation/run')
+def integrations_real_connector_activation_run_endpoint(payload: RealConnectorActivationRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'integrations.manage')
+    try:
+        return run_real_connector_activation(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get('/api/integrations/campus-data-validation/status')

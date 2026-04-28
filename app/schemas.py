@@ -1299,6 +1299,27 @@ class FinancialCloseCertificationRunCreate(BaseModel):
     period: str = Field(default='2026-08', pattern=r'^\d{4}-\d{2}$')
 
 
+class ConsolidationCertificationRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    scenario_id: int | None = None
+    period: str = Field(default='2026-12', pattern=r'^\d{4}-\d{2}$')
+
+
+class ReportingPixelPolishRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    scenario_id: int | None = None
+    period_start: str = Field(default='2026-07', pattern=r'^\d{4}-\d{2}$')
+    period_end: str = Field(default='2026-12', pattern=r'^\d{4}-\d{2}$')
+
+
+class RealConnectorActivationRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+
+
+class SecurityActivationCertificationRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+
+
 class ModelScenarioBranchCreate(BaseModel):
     source_scenario_id: int | None = None
     branch_key: str | None = Field(default=None, max_length=120)
