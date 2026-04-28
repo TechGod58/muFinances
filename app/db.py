@@ -38,6 +38,61 @@ _SQLITE_POOL: Queue[sqlite3.Connection] = Queue(maxsize=DB_POOL_SIZE)
 _SQLITE_POOL_LOCK = threading.Lock()
 _POSTGRES_POOL: Any | None = None
 _NO_RETURNING_ID_TABLES = {'user_roles', 'role_permissions'}
+SECURE_FINANCIAL_AUDIT_ENTITY_TYPES = {
+    'account_reconciliation',
+    'actuals_ingest',
+    'board_package',
+    'budget_assumption',
+    'budget_line',
+    'budget_submission',
+    'budget_transfer',
+    'capital_request',
+    'close_checklist',
+    'consolidation_run',
+    'currency_rate',
+    'elimination_entry',
+    'enrollment_forecast',
+    'entity_confirmation',
+    'faculty_load',
+    'forecast_run',
+    'form990_support_field',
+    'grant_budget',
+    'intercompany_match',
+    'journal_adjustment',
+    'plan_line_item',
+    'planning_ledger',
+    'profitability_allocation_run',
+    'profitability_cost_pool',
+    'report_definition',
+    'reporting_pixel_polish',
+    'scenario',
+    'tax_activity_classification',
+    'tax_change_alert',
+    'tax_rule_source',
+    'tax_update_check',
+    'tuition_forecast',
+    'tuition_rate',
+    'variance_explanation',
+    'workforce_position',
+}
+SECURE_FINANCIAL_AUDIT_PREFIXES = (
+    'ai_production_guardrail',
+    'allocation',
+    'campus_data_validation',
+    'consolidation_',
+    'export_',
+    'financial_',
+    'forecast_',
+    'fpa_',
+    'ledger_',
+    'operating_budget',
+    'parity_gap_review',
+    'pilot_deployment',
+    'production_release_candidate',
+    'real_connector_activation',
+    'report_',
+    'scenario_',
+)
 
 
 def row_factory(cursor: sqlite3.Cursor, row: tuple[Any, ...]) -> dict[str, Any]:
@@ -803,6 +858,21 @@ def init_db() -> None:
                 row_hash TEXT NOT NULL,
                 sealed_at TEXT NOT NULL,
                 FOREIGN KEY (audit_log_id) REFERENCES audit_logs(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS secure_financial_audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                audit_log_id INTEGER NOT NULL UNIQUE,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                action TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                detail_json TEXT NOT NULL,
+                detail_checksum TEXT NOT NULL,
+                previous_hash TEXT NOT NULL,
+                row_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                sealed_at TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS sod_rules (
@@ -3578,6 +3648,12 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_created
             ON audit_logs (entity_type, entity_id, created_at);
 
+            CREATE INDEX IF NOT EXISTS idx_secure_financial_audit_entity_created
+            ON secure_financial_audit_logs (entity_type, entity_id, created_at);
+
+            CREATE INDEX IF NOT EXISTS idx_secure_financial_audit_created
+            ON secure_financial_audit_logs (created_at);
+
             CREATE INDEX IF NOT EXISTS idx_performance_benchmark_metrics_run
             ON performance_benchmark_metrics (run_id, metric_key);
 
@@ -3726,6 +3802,17 @@ def _log_audit_with_connection(conn: Any, entity_type: str, entity_id: str, acti
         (entity_type, entity_id, action, actor, detail_json, created_at),
     ).lastrowid)
     seal_audit_log(audit_log_id, conn=conn)
+    if is_secure_financial_audit_event(entity_type):
+        _log_secure_financial_audit_with_connection(
+            conn,
+            audit_log_id,
+            entity_type,
+            entity_id,
+            action,
+            actor,
+            detail_json,
+            created_at,
+        )
 
 
 def seal_audit_log(audit_log_id: int, conn: Any | None = None) -> str:
@@ -3767,6 +3854,108 @@ def audit_row_hash(row: dict[str, Any], previous_hash: str) -> str:
         'previous_hash': previous_hash,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
+
+
+def is_secure_financial_audit_event(entity_type: str) -> bool:
+    normalized = entity_type.strip().lower()
+    return normalized in SECURE_FINANCIAL_AUDIT_ENTITY_TYPES or normalized.startswith(SECURE_FINANCIAL_AUDIT_PREFIXES)
+
+
+def _log_secure_financial_audit_with_connection(
+    conn: Any,
+    audit_log_id: int,
+    entity_type: str,
+    entity_id: str,
+    action: str,
+    actor: str,
+    detail_json: str,
+    created_at: str,
+) -> None:
+    existing = conn.execute('SELECT id FROM secure_financial_audit_logs WHERE audit_log_id = ?', (audit_log_id,)).fetchone()
+    if existing is not None:
+        return
+    previous = conn.execute('SELECT row_hash FROM secure_financial_audit_logs ORDER BY id DESC LIMIT 1').fetchone()
+    previous_hash = str(previous['row_hash']) if previous else 'FINANCIAL_AUDIT_GENESIS'
+    detail_checksum = hashlib.sha256(detail_json.encode('utf-8')).hexdigest()
+    sealed_at = created_at
+    row_hash = secure_financial_audit_row_hash(
+        {
+            'audit_log_id': audit_log_id,
+            'entity_type': entity_type,
+            'entity_id': entity_id,
+            'action': action,
+            'actor': actor,
+            'detail_checksum': detail_checksum,
+            'created_at': created_at,
+            'sealed_at': sealed_at,
+        },
+        previous_hash,
+    )
+    conn.execute(
+        '''
+        INSERT INTO secure_financial_audit_logs (
+            audit_log_id, entity_type, entity_id, action, actor, detail_json,
+            detail_checksum, previous_hash, row_hash, created_at, sealed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        (
+            audit_log_id,
+            entity_type,
+            entity_id,
+            action,
+            actor,
+            detail_json,
+            detail_checksum,
+            previous_hash,
+            row_hash,
+            created_at,
+            sealed_at,
+        ),
+    )
+
+
+def secure_financial_audit_row_hash(row: dict[str, Any], previous_hash: str) -> str:
+    payload = {
+        'audit_log_id': row['audit_log_id'],
+        'entity_type': row['entity_type'],
+        'entity_id': row['entity_id'],
+        'action': row['action'],
+        'actor': row['actor'],
+        'detail_checksum': row['detail_checksum'],
+        'created_at': row['created_at'],
+        'sealed_at': row['sealed_at'],
+        'previous_hash': previous_hash,
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
+
+
+def verify_secure_financial_audit_chain(limit: int = 5000) -> dict[str, Any]:
+    rows = fetch_all(
+        'SELECT * FROM secure_financial_audit_logs ORDER BY id ASC LIMIT ?',
+        (max(1, min(limit, 50000)),),
+    )
+    previous_hash = 'FINANCIAL_AUDIT_GENESIS'
+    broken: list[dict[str, Any]] = []
+    for row in rows:
+        expected_detail_checksum = hashlib.sha256(str(row['detail_json']).encode('utf-8')).hexdigest()
+        expected_row_hash = secure_financial_audit_row_hash(row, previous_hash)
+        if row['previous_hash'] != previous_hash or row['detail_checksum'] != expected_detail_checksum or row['row_hash'] != expected_row_hash:
+            broken.append(
+                {
+                    'id': row['id'],
+                    'audit_log_id': row['audit_log_id'],
+                    'entity_type': row['entity_type'],
+                    'entity_id': row['entity_id'],
+                    'reason': 'hash_chain_mismatch',
+                }
+            )
+        previous_hash = row['row_hash']
+    return {
+        'checked': len(rows),
+        'valid': not broken,
+        'broken': broken,
+        'last_hash': previous_hash if rows else 'FINANCIAL_AUDIT_GENESIS',
+    }
 
 
 def log_application(log_type: str, severity: str, message: str, actor: str = 'system', detail: dict[str, Any] | None = None, correlation_id: str = '') -> None:

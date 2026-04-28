@@ -4717,7 +4717,8 @@ def workflow_designer_campaign_monitors(request: Request, scenario_id: int = Que
 
 
 @app.get('/api/audit-logs', response_model=list[AuditLogOut])
-def get_audit_logs(limit: int = Query(50, ge=1, le=250)) -> list[dict[str, Any]]:
+def get_audit_logs(request: Request, limit: int = Query(50, ge=1, le=250)) -> list[dict[str, Any]]:
+    _require(request, 'operations.manage')
     return db.fetch_all('SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?', (limit,))
 
 
