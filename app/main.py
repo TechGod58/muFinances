@@ -123,6 +123,7 @@ from app.schemas import (
     OperationalCheckCreate,
     OperationsAlertRouteCreate,
     OperationsReadinessRunCreate,
+    ParallelCubedOptimizationRunCreate,
     OfficeCellCommentCreate,
     PeriodCloseCalendarCreate,
     PeriodLockAction,
@@ -189,6 +190,7 @@ from app.schemas import (
     UniversityAgentClientCreate,
     UniversityAgentPolicyCreate,
     UserCreate,
+    UserAcceptanceTestRunCreate,
     UserAccessReviewCreate,
     UserAccessReviewDecision,
     UserDimensionAccessCreate,
@@ -825,6 +827,18 @@ from app.services.parallel_cubed_engine import (
     status as parallel_cubed_engine_status,
     workspace as parallel_cubed_engine_workspace,
 )
+from app.services.parallel_cubed_production_optimization import (
+    get_run as get_parallel_cubed_optimization_run,
+    list_runs as list_parallel_cubed_optimization_runs,
+    run_optimization as run_parallel_cubed_optimization,
+    status as parallel_cubed_optimization_status,
+)
+from app.services.user_acceptance_testing import (
+    get_run as get_user_acceptance_run,
+    list_runs as list_user_acceptance_runs,
+    run_uat as run_user_acceptance_testing,
+    status as user_acceptance_testing_status,
+)
 from app.services.observability_operations import (
     acknowledge_alert as acknowledge_observability_alert,
     list_alerts as list_observability_alerts,
@@ -1232,6 +1246,37 @@ def disaster_recovery_release_run_endpoint(payload: DisasterRecoveryReleaseRunCr
     _require(request, 'operations.manage')
     try:
         return run_disaster_recovery_release_governance(payload.model_dump(), request.state.user, getattr(request.state, 'trace_id', ''))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/user-acceptance/status')
+def user_acceptance_testing_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return user_acceptance_testing_status()
+
+
+@app.get('/api/user-acceptance/runs')
+def user_acceptance_testing_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_user_acceptance_runs(limit)
+    return {'count': len(rows), 'uat_runs': rows}
+
+
+@app.get('/api/user-acceptance/runs/{run_id}')
+def user_acceptance_testing_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_user_acceptance_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/user-acceptance/run')
+def user_acceptance_testing_run_create_endpoint(payload: UserAcceptanceTestRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_user_acceptance_testing(payload.model_dump(), request.state.user)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -5517,6 +5562,37 @@ def performance_run_parallel_cubed_endpoint(payload: ParallelCubedRunCreate, req
     _require(request, 'operations.manage')
     try:
         return run_parallel_cubed_engine(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/performance/parallel-cubed/optimization/status')
+def performance_parallel_cubed_optimization_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return parallel_cubed_optimization_status()
+
+
+@app.get('/api/performance/parallel-cubed/optimization/runs')
+def performance_parallel_cubed_optimization_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_parallel_cubed_optimization_runs(limit)
+    return {'count': len(rows), 'optimization_runs': rows}
+
+
+@app.get('/api/performance/parallel-cubed/optimization/runs/{run_id}')
+def performance_parallel_cubed_optimization_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_parallel_cubed_optimization_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/performance/parallel-cubed/optimization/run')
+def performance_run_parallel_cubed_optimization_endpoint(payload: ParallelCubedOptimizationRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_parallel_cubed_optimization(payload.model_dump(), request.state.user)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 

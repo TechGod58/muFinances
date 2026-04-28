@@ -1367,6 +1367,17 @@ class DisasterRecoveryReleaseRunCreate(BaseModel):
     release_version: str = Field(default='B106.0', min_length=1, max_length=80)
 
 
+class UserAcceptanceTestRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+
+
+class ParallelCubedOptimizationRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    scenario_id: int | None = None
+    row_count: int = Field(default=720, ge=24, le=50000)
+    max_workers: int | None = Field(default=None, ge=1, le=64)
+
+
 class ModelScenarioBranchCreate(BaseModel):
     source_scenario_id: int | None = None
     branch_key: str | None = Field(default=None, max_length=120)
