@@ -2,6 +2,12 @@
 
 A local-first financial performance management scaffold for replacing Prophix on campus.
 
+## Repository purpose
+
+muFinances is a campus-focused financial planning platform for budgeting, forecasting, reporting, close, consolidation, audit evidence, and internal operations. It is designed for local or internal server deployment and uses a dimensional planning ledger, service-layer controls, secure audit trails, governed imports, and role-based workflows.
+
+This repository is public so the project purpose, architecture, and development history are visible. Production deployments still require Manchester-specific identity, database, network, secret, and data controls before use with real financial data.
+
 This is not a Prophix clone. The core design is intentionally different:
 
 - **Driver graph engine** instead of spreadsheet-template-first planning.
