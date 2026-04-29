@@ -13,7 +13,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY static ./static
+COPY services ./services
+COPY docs ./docs
+COPY schema ./schema
+COPY migration_proof ./migration_proof
+COPY deploy ./deploy
 COPY README.md .
+COPY docker-compose.yml .
+COPY docker-compose.postgres.yml .
 
 EXPOSE 3200
 

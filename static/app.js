@@ -3,6 +3,8 @@ const state = {
   activeScenarioId: null,
   bootstrap: null,
   token: window.localStorage.getItem('mufinances.token'),
+  sessionMode: window.sessionStorage.getItem('mufinances.sessionMode') || 'bearer',
+  csrfToken: window.sessionStorage.getItem('mufinances.csrf') || '',
   activePeriod: window.localStorage.getItem('mufinances.period') || null,
   commandDeckCollapsed: window.localStorage.getItem('mufinances.commandDeckCollapsed') === 'true',
   marketLab: null,
@@ -101,6 +103,7 @@ const api = {
       const response = await fetch(path, {
         method,
         headers: body ? { 'Content-Type': 'application/json', ...authHeaders() } : authHeaders(),
+        credentials: 'same-origin',
         body: body ? JSON.stringify(body) : null,
       });
       if (!response.ok) {
@@ -134,11 +137,14 @@ const api = {
 };
 
 function authHeaders() {
-  return state.token ? { Authorization: `Bearer ${state.token}` } : {};
+  const headers = {};
+  if (state.token) headers.Authorization = `Bearer ${state.token}`;
+  if (state.csrfToken) headers['X-CSRF-Token'] = state.csrfToken;
+  return headers;
 }
 
 async function downloadArtifact(url, fileName = 'mufinances-artifact') {
-  const response = await fetch(url, { headers: authHeaders() });
+  const response = await fetch(url, { headers: authHeaders(), credentials: 'same-origin' });
   if (!response.ok) {
     throw new Error(`Download failed (${response.status})`);
   }
@@ -160,7 +166,11 @@ function showAuthGate() {
 
 function clearSession() {
   state.token = null;
+  state.sessionMode = 'bearer';
+  state.csrfToken = '';
   window.localStorage.removeItem('mufinances.token');
+  window.sessionStorage.removeItem('mufinances.sessionMode');
+  window.sessionStorage.removeItem('mufinances.csrf');
 }
 
 function showAppShell() {
@@ -211,6 +221,7 @@ async function handleLogin(formData) {
   const response = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
@@ -218,8 +229,17 @@ async function handleLogin(formData) {
     throw new Error(error.detail || 'Sign in failed.');
   }
   const result = await response.json();
-  state.token = result.token;
-  window.localStorage.setItem('mufinances.token', result.token);
+  state.sessionMode = result.session_mode || (result.token ? 'bearer' : 'cookie');
+  state.csrfToken = result.csrf_token || '';
+  window.sessionStorage.setItem('mufinances.sessionMode', state.sessionMode);
+  if (state.csrfToken) window.sessionStorage.setItem('mufinances.csrf', state.csrfToken);
+  if (state.sessionMode === 'cookie') {
+    state.token = null;
+    window.localStorage.removeItem('mufinances.token');
+  } else {
+    state.token = result.token;
+    window.localStorage.setItem('mufinances.token', result.token);
+  }
   if (result.user?.must_change_password) {
     $('#passwordChangeDialog').showModal();
     return;
@@ -238,8 +258,8 @@ async function handlePasswordChange(formData) {
 }
 
 async function validateSession() {
-  if (!state.token) return false;
-  const response = await fetch('/api/auth/me', { headers: authHeaders() });
+  if (!state.token && state.sessionMode !== 'cookie') return false;
+  const response = await fetch('/api/auth/me', { headers: authHeaders(), credentials: 'same-origin' });
   if (!response.ok) {
     clearSession();
     return false;
@@ -5837,6 +5857,27 @@ function wireGlobalActions() {
     }
   });
 }
+
+window.muFinancesApp = {
+  batch: 'B140',
+  state,
+  api,
+  helpers: {
+    authHeaders,
+    clearSession,
+    downloadArtifact,
+    renderTable,
+    setBusy,
+    toast,
+  },
+  workflows: {
+    loadBootstrap,
+    showAppShell,
+    showAuthGate,
+    toggleCommandDeck,
+  },
+};
+window.muFinancesState = state;
 
 (async function init() {
 wireDialogs();

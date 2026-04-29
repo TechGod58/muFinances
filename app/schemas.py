@@ -1228,6 +1228,21 @@ class EnterpriseScaleBenchmarkRunCreate(BaseModel):
     thresholds: dict[str, int] = Field(default_factory=dict)
 
 
+class ProductionScaleBenchmarkRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    years: int = Field(default=7, ge=5, le=10)
+    scenario_count: int = Field(default=10, ge=6, le=50)
+    department_count: int = Field(default=80, ge=40, le=500)
+    grant_count: int = Field(default=60, ge=25, le=500)
+    employee_count: int = Field(default=1250, ge=500, le=10000)
+    account_count: int = Field(default=160, ge=80, le=1000)
+    ledger_row_count: int = Field(default=30000, ge=12000, le=250000)
+    benchmark_row_count: int = Field(default=30000, ge=12000, le=250000)
+    user_count: int = Field(default=60, ge=12, le=1000)
+    backend: Literal['sqlite', 'postgres', 'runtime'] = 'runtime'
+    thresholds: dict[str, int] = Field(default_factory=dict)
+
+
 class IndexRecommendationCreate(BaseModel):
     recommendation_key: str = Field(min_length=1, max_length=120)
     table_name: str = Field(min_length=1, max_length=120)
@@ -1316,6 +1331,13 @@ class RealConnectorActivationRunCreate(BaseModel):
     run_key: str | None = Field(default=None, max_length=120)
 
 
+class ConnectorLiveTrialRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    scenario_id: int | None = None
+    live_mode: bool = False
+    credential_refs: dict[str, str] = Field(default_factory=dict)
+
+
 class SecurityActivationCertificationRunCreate(BaseModel):
     run_key: str | None = Field(default=None, max_length=120)
 
@@ -1326,6 +1348,16 @@ class AuditComplianceCertificationRunCreate(BaseModel):
 
 
 class AIProductionGuardrailRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    scenario_id: int | None = None
+
+
+class AIProviderLiveGuardrailRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    scenario_id: int | None = None
+
+
+class OfficeAdoptionLiveProofRunCreate(BaseModel):
     run_key: str | None = Field(default=None, max_length=120)
     scenario_id: int | None = None
 
@@ -1427,9 +1459,29 @@ class PilotDeploymentRunCreate(BaseModel):
     selected_users: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class MultiUserPilotCycleRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    release_version: str = Field(default='B127.pilot-cycle', min_length=1, max_length=80)
+    internal_server_url: str | None = Field(default=None, max_length=240)
+    database_backend: Literal['sqlite', 'postgres', 'mssql'] = 'mssql'
+    selected_users: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class PilotDefectUIPolishRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    scenario_id: int | None = None
+    pilot_cycle_run_id: int | None = None
+
+
 class ParityGapReviewRunCreate(BaseModel):
     run_key: str | None = Field(default=None, max_length=120)
     pilot_run_id: int | None = None
+
+
+class ProphixFinalGapReviewRunCreate(BaseModel):
+    run_key: str | None = Field(default=None, max_length=120)
+    pilot_cycle_run_id: int | None = None
+    feature_results: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProductionReleaseCandidateRunCreate(BaseModel):

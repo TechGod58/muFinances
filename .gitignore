@@ -4,6 +4,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
 
 # Virtual environments and local config
 .venv/
@@ -21,10 +24,21 @@ env/
 *.db-wal
 data/
 logs/
+backups/
+exports/
+generated_exports/
+release/
+dist/
+build/
+*.bak
+*.backup
+*.dump
+*.zip
 *.log
 
 # Local generated review/import material
 .tmp_parallel_cubed_review/
+.tmp_*_review/
 tmp/
 temp/
 
@@ -32,6 +46,12 @@ temp/
 deploy/secrets/*
 !deploy/secrets/.gitignore
 !deploy/secrets/*.example
+deploy/secrets/*.txt
+*.pem
+*.pfx
+*.key
+*.crt
+*.token
 
 # Node/browser artifacts
 node_modules/

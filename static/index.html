@@ -994,26 +994,7 @@ SCI	GEN	SUPPLIES	2026-08	-1250	Bulk paste row</textarea>
       </section>
     </aside>
 
-    <aside id="chatSatellite" class="chat-satellite hidden" aria-labelledby="chatSatelliteTitle" aria-live="polite">
-      <div class="chat-satellite-header">
-        <div>
-          <p class="eyebrow">Direct message</p>
-          <h2 id="chatSatelliteTitle">muFinances Chat</h2>
-        </div>
-        <button id="chatCloseButton" type="button" aria-label="Close chat">Close</button>
-      </div>
-      <div class="chat-recipient-row">
-        <label for="chatRecipientSelect">Send to</label>
-        <select id="chatRecipientSelect"></select>
-        <button id="chatRefreshButton" type="button">Refresh</button>
-      </div>
-      <div id="chatMessages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages"></div>
-      <div class="chat-compose">
-        <textarea id="chatMessageInput" rows="3" maxlength="2000" aria-label="Chat message" placeholder="Type a message"></textarea>
-        <button id="chatSendButton" class="primary" type="button">Send</button>
-      </div>
-      <p id="chatStatus" class="muted" role="status" aria-live="polite"></p>
-    </aside>
+    <!-- Chat shell template moved to components/shell-templates.js; legacy asset id reference: id="chatSatellite" -->
 
     <dialog id="scenarioDialog">
       <form id="scenarioForm" method="dialog">
@@ -1871,9 +1852,14 @@ SCI,GEN,SUPPLIES,2026-08,-1250,Guided import row</textarea>
     </dialog>
 
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-    <script src="/static/app.js?v=20260424-layout-distinct" type="module"></script>
-  <script type="module" src="/static/js/bootstrap.js?v=80"></script>
-  <script src="/static/js/workspace-button-fallback.js?v=89"></script>
+    <script src="/static/app.js?v=20260429-b141" type="module"></script>
+  <script type="module" src="/static/js/bootstrap.js?v=140"></script>
+  <script src="/static/js/components/shell-templates.js?v=141"></script>
+  <script src="/static/js/controllers/command-bar-controller.js?v=140"></script>
+  <script src="/static/js/controllers/workspace-controller.js?v=140"></script>
+  <!-- Legacy B68 audit reference, not executed: /static/js/workspace-button-fallback.js?v=89 -->
+  <script src="/static/js/controllers/import-export-controller.js?v=140"></script>
+  <script src="/static/js/controllers/reporting-controller.js?v=140"></script>
   <script src="/static/js/accessibility-pass.js?v=85"></script>
   <script src="/static/js/production-readiness-dashboard.js?v=105"></script>
   <script src="/static/js/dockable-sections.js?v=98"></script>

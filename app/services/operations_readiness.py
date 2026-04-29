@@ -65,6 +65,7 @@ def status() -> dict[str, Any]:
     alerts = list_alerts(limit=25)
     routes = list_alert_routes()
     dashboard = production_readiness_dashboard()
+    runtime = db.database_runtime()
     checks = {
         'health_checks_ready': bool(probes) or dashboard_component_status(dashboard, 'Health checks') == 'ok',
         'metrics_ready': bool(metrics),
@@ -74,6 +75,8 @@ def status() -> dict[str, Any]:
         'job_diagnostics_ready': bool(jobs) and bool(job_logs),
         'worker_status_ready': bool(jobs) and bool(job_logs),
         'production_readiness_dashboard_ready': bool(dashboard['components']),
+        'database_runtime_classified': runtime['postgres_status'] in {'ready', 'not_configured', 'not_available'} and runtime['mssql_status'] in {'ready', 'not_configured', 'not_available'},
+        'active_database_backend_ready': runtime['active_backend_status'] == 'ready',
     }
     counts = {
         'readiness_runs': int(db.fetch_one('SELECT COUNT(*) AS count FROM operations_readiness_runs')['count']),
@@ -92,6 +95,7 @@ def status() -> dict[str, Any]:
         'checks': checks,
         'counts': counts,
         'latest_run': _format_run(latest) if latest else None,
+        'database': runtime,
         'dashboard': dashboard,
     }
 
@@ -226,27 +230,64 @@ def production_readiness_dashboard() -> dict[str, Any]:
     _ensure_tables()
     runtime = db.database_runtime()
     latest_migration = db.fetch_one('SELECT * FROM schema_migrations ORDER BY migration_key DESC LIMIT 1')
+    migration_counts = db.fetch_one('SELECT COUNT(*) AS count FROM schema_migrations')
     job_counts = db.fetch_all('SELECT status, COUNT(*) AS count FROM background_jobs GROUP BY status ORDER BY status')
     latest_backup = db.fetch_one('SELECT * FROM backup_records ORDER BY id DESC LIMIT 1')
     latest_drill = db.fetch_one('SELECT * FROM backup_restore_drill_runs ORDER BY id DESC LIMIT 1')
     latest_probe = db.fetch_one('SELECT * FROM health_probe_runs ORDER BY id DESC LIMIT 1')
     open_alerts = int(db.fetch_one("SELECT COUNT(*) AS count FROM alert_events WHERE status = 'open'")['count'])
     log_count = int(db.fetch_one('SELECT COUNT(*) AS count FROM application_logs')['count'])
+    secure_audit = _evidence_or_error('secure_audit', _secure_audit_evidence)
+    mssql = _evidence_or_error('mssql', _mssql_evidence)
+    identity = _evidence_or_error('identity', _identity_evidence)
+    connectors = _evidence_or_error('connectors', _connector_evidence)
+    alerts = _alert_evidence(open_alerts)
+    workers = {
+        'counts': {row['status']: int(row['count']) for row in job_counts},
+        'status': _worker_status(job_counts),
+        'detail': _worker_detail(job_counts),
+    }
+    backup = {
+        'latest_backup': dict(latest_backup) if latest_backup else None,
+        'latest_drill': dict(latest_drill) if latest_drill else None,
+        'status': 'ok' if latest_backup and latest_drill else 'warning',
+    }
+    migration = {
+        'latest': dict(latest_migration) if latest_migration else None,
+        'registered_count': int(migration_counts['count'] if migration_counts else 0),
+        'status': 'ok' if latest_migration else 'blocked',
+    }
     components = [
         _component('Database mode', 'ok' if runtime['backend'] in {'sqlite', 'postgres', 'mssql'} else 'blocked', f"{runtime['backend']} backend, pooling={runtime['pooling_enabled']}"),
-        _component('Migration status', 'ok' if latest_migration else 'blocked', latest_migration['migration_key'] if latest_migration else 'No migrations recorded'),
+        _component('Migration status', migration['status'], latest_migration['migration_key'] if latest_migration else 'No migrations recorded'),
         _component('Auth mode', 'warning', 'Local auth active; SSO/AD handoff remains environment configured.'),
         _component('Worker status', _worker_status(job_counts), _worker_detail(job_counts)),
         _component('Backup status', 'ok' if latest_backup and latest_drill else 'warning', f"latest backup={latest_backup['backup_key'] if latest_backup else 'none'}, latest drill={latest_drill['status'] if latest_drill else 'none'}"),
         _component('Health checks', 'ok' if latest_probe and latest_probe['status'] == 'pass' else 'warning', latest_probe['probe_key'] if latest_probe else 'No health probes have run.'),
         _component('Logs', 'ok' if log_count >= 1 else 'warning', f'{log_count} application log records'),
         _component('Alerts', 'warning' if open_alerts else 'ok', f'{open_alerts} open alert events'),
+        _component('Secure audit verification', _status_from_evidence(secure_audit), _secure_audit_detail(secure_audit)),
+        _component('MS SQL status', _status_from_evidence(mssql), _mssql_detail(mssql)),
+        _component('Identity status', _status_from_evidence(identity), _identity_detail(identity)),
+        _component('Connector health', _connector_status(connectors), _connector_detail(connectors)),
+        _component('Alert evidence', alerts['status'], f"{alerts['open_count']} open, {alerts['sample_count']} sampled"),
     ]
     return {
         'batch': 'B105',
+        'evidence_batch': 'B119',
         'generated_at': _now(),
         'overall_status': _overall_status(components),
         'database': runtime,
+        'evidence': {
+            'secure_audit': secure_audit,
+            'mssql': mssql,
+            'migration': migration,
+            'backup': backup,
+            'identity': identity,
+            'connectors': connectors,
+            'workers': workers,
+            'alerts': alerts,
+        },
         'components': components,
     }
 
@@ -281,6 +322,126 @@ def _overall_status(components: list[dict[str, Any]]) -> str:
     if 'warning' in statuses:
         return 'warning'
     return 'ok'
+
+
+def _evidence_or_error(name: str, producer: Any) -> dict[str, Any]:
+    try:
+        return producer()
+    except Exception as exc:
+        return {
+            'source': name,
+            'complete': False,
+            'status': 'blocked',
+            'error': str(exc),
+            'checks': {},
+            'counts': {},
+        }
+
+
+def _secure_audit_evidence() -> dict[str, Any]:
+    from app.services.secure_audit_operations import status as secure_audit_status
+
+    return secure_audit_status()
+
+
+def _mssql_evidence() -> dict[str, Any]:
+    from app.services.mssql_live_proof import status as mssql_status
+
+    return mssql_status()
+
+
+def _identity_evidence() -> dict[str, Any]:
+    from app.services.manchester_identity_live_proof import status as identity_status
+
+    return identity_status()
+
+
+def _connector_evidence() -> dict[str, Any]:
+    from app.services.campus_integrations import connector_health_dashboard, marketplace_status, seed_connector_marketplace
+
+    seed_connector_marketplace()
+    health = connector_health_dashboard()
+    marketplace = marketplace_status()
+    connectors = health.get('connectors', [])
+    checked = [row for row in connectors if row.get('status') != 'not_checked']
+    healthy = [row for row in connectors if row.get('status') == 'healthy']
+    marketplace_counts = marketplace.get('counts') or {}
+    return {
+        'batch': 'B119',
+        'title': 'Connector Health Evidence',
+        'complete': marketplace.get('complete') is True,
+        'checks': {
+            'connector_health_dashboard_ready': True,
+            'adapter_marketplace_ready': marketplace.get('complete') is True,
+            'erp_sis_hr_payroll_grants_banking_brokerage_listed': int(marketplace_counts.get('adapters', 0)) >= 7,
+            'health_checks_recorded': len(checked) >= 1,
+        },
+        'counts': {
+            'connectors': len(connectors),
+            'adapters': int(marketplace_counts.get('adapters', 0)),
+            'checked': len(checked),
+            'healthy': len(healthy),
+        },
+        'dashboard': health,
+        'marketplace': marketplace,
+    }
+
+
+def _alert_evidence(open_alerts: int) -> dict[str, Any]:
+    alerts = list_alerts(limit=25)
+    return {
+        'status': 'warning' if open_alerts else 'ok',
+        'open_count': open_alerts,
+        'sample_count': len(alerts),
+        'latest': alerts[0] if alerts else None,
+        'sample': alerts,
+    }
+
+
+def _status_from_evidence(evidence: dict[str, Any]) -> str:
+    if evidence.get('status') == 'blocked' or evidence.get('error'):
+        return 'blocked'
+    return 'ok' if evidence.get('complete') else 'warning'
+
+
+def _secure_audit_detail(evidence: dict[str, Any]) -> str:
+    if evidence.get('error'):
+        return evidence['error']
+    checks = evidence.get('checks') or {}
+    counts = evidence.get('counts') or {}
+    return f"chain={checks.get('secure_financial_audit_chain_ready')}, logs={counts.get('secure_audit_logs', 0)}, verifications={counts.get('backup_verifications', 0)}"
+
+
+def _mssql_detail(evidence: dict[str, Any]) -> str:
+    if evidence.get('error'):
+        return evidence['error']
+    checks = evidence.get('checks') or {}
+    database = evidence.get('database') or {}
+    return f"driver={checks.get('mssql_driver_ready')}, dsn={database.get('mssql_dsn_configured')}, pooling={database.get('pooling_enabled')}"
+
+
+def _identity_detail(evidence: dict[str, Any]) -> str:
+    if evidence.get('error'):
+        return evidence['error']
+    checks = evidence.get('checks') or {}
+    counts = evidence.get('counts') or {}
+    return f"sso={checks.get('production_sso_ready')}, ou={checks.get('ad_ou_validation_ready')}, mappings={counts.get('ad_ou_mappings', 0)}"
+
+
+def _connector_status(evidence: dict[str, Any]) -> str:
+    if evidence.get('error'):
+        return 'blocked'
+    checks = evidence.get('checks') or {}
+    if checks.get('adapter_marketplace_ready') and checks.get('erp_sis_hr_payroll_grants_banking_brokerage_listed'):
+        return 'ok' if checks.get('health_checks_recorded') else 'warning'
+    return 'blocked'
+
+
+def _connector_detail(evidence: dict[str, Any]) -> str:
+    if evidence.get('error'):
+        return evidence['error']
+    counts = evidence.get('counts') or {}
+    return f"{counts.get('adapters', 0)} adapters, {counts.get('connectors', 0)} connectors, {counts.get('checked', 0)} checked, {counts.get('healthy', 0)} healthy"
 
 
 def _one(query: str, params: tuple[Any, ...]) -> dict[str, Any]:

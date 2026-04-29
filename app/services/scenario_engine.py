@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app import db
+from app.contracts.financial import ForecastRunContract
 from app.services.formula_engine import expression_names
 from app.services.foundation import append_ledger_entry, list_ledger_entries
 
@@ -187,6 +188,7 @@ def list_methods() -> list[dict[str, Any]]:
 
 
 def run_forecast(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    payload = ForecastRunContract.model_validate(payload).model_dump()
     ensure_forecast_methods()
     method = payload['method_key']
     scenario_id = payload['scenario_id']

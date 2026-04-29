@@ -196,6 +196,9 @@ def _ensure_workload_rows(scenario_id: int, target_count: int, run_key: str, use
     departments = ['SCI', 'ART', 'OPS', 'ADM', 'ATH', 'FIN']
     accounts = ['TUITION', 'SALARY', 'SUPPLIES', 'BENEFITS', 'GRANTS', 'AUXILIARY']
     for index in range(missing):
+        amount = float(((index % 11) - 5) * 310)
+        if round(amount, 2) == 0:
+            amount = 310.0
         append_ledger_entry(
             {
                 'scenario_id': scenario_id,
@@ -204,7 +207,7 @@ def _ensure_workload_rows(scenario_id: int, target_count: int, run_key: str, use
                 'fund_code': 'GEN',
                 'account_code': accounts[index % len(accounts)],
                 'period': periods[index % len(periods)],
-                'amount': float(((index % 11) - 5) * 310),
+                'amount': amount,
                 'source': 'parallel_cubed_optimization',
                 'ledger_type': 'forecast',
                 'notes': 'B108 optimization workload row',

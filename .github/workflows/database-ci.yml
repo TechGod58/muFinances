@@ -1,0 +1,87 @@
+name: Database Runtime Matrix
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  sqlite:
+    name: SQLite migrations and targeted integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+      - name: Run SQLite database tests
+        env:
+          CAMPUS_FPM_DB_BACKEND: sqlite
+          CAMPUS_FPM_DB_PATH: ${{ runner.temp }}/mufinances-sqlite.db
+        run: |
+          python -m pytest \
+            tests/test_postgres_runtime.py \
+            tests/test_migration_framework.py \
+            tests/test_migration_proof.py \
+            tests/test_production_data_platform_cutover.py \
+            tests/test_performance_reliability.py
+
+  postgres:
+    name: PostgreSQL service migrations and drift checks
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: mufinances
+          POSTGRES_USER: mufinances
+          POSTGRES_PASSWORD: mufinances_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mufinances -d mufinances"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+      - name: Run PostgreSQL runtime tests
+        env:
+          CAMPUS_FPM_DB_BACKEND: postgres
+          CAMPUS_FPM_POSTGRES_DSN: postgresql://mufinances:mufinances_ci_password@127.0.0.1:5432/mufinances
+          CAMPUS_FPM_DB_SSL_MODE: disable
+        run: |
+          python -m pytest \
+            tests/test_postgres_runtime.py \
+            tests/test_migration_framework.py \
+            tests/test_migration_proof.py \
+            tests/test_production_data_platform_cutover.py
+
+  mssql-ready:
+    name: MS SQL readiness validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+      - name: Validate SQL Server translation and readiness hooks
+        env:
+          CAMPUS_FPM_DB_BACKEND: sqlite
+          CAMPUS_FPM_DB_PATH: ${{ runner.temp }}/mufinances-mssql-ready.db
+          CAMPUS_FPM_MSSQL_DSN: Driver={ODBC Driver 18 for SQL Server};Server=tcp:sqlserver.example.invalid,1433;Database=mufinances;Encrypt=yes;TrustServerCertificate=no;
+        run: |
+          python -m pytest \
+            tests/test_postgres_runtime.py \
+            tests/test_mssql_live_proof.py \
+            tests/test_release_hygiene_packaging_docker.py

@@ -21,6 +21,7 @@ export class ApiClient {
   constructor(options = {}) {
     this.baseUrl = options.baseUrl || '';
     this.getToken = options.getToken || (() => null);
+    this.getCsrfToken = options.getCsrfToken || (() => null);
   }
 
   async request(path, options = {}) {
@@ -34,10 +35,15 @@ export class ApiClient {
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
+    const csrfToken = this.getCsrfToken();
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
 
     const response = await fetch(joinUrl(this.baseUrl, path), {
       ...options,
       headers,
+      credentials: options.credentials || 'same-origin',
       body: options.body === undefined || typeof options.body === 'string'
         ? options.body
         : JSON.stringify(options.body),
@@ -78,6 +84,6 @@ export class ApiClient {
 export function createDefaultApiClient() {
   return new ApiClient({
     getToken: () => window.muFinancesState?.token || window.state?.token || localStorage.getItem('mufinances.token'),
+    getCsrfToken: () => window.muFinancesState?.csrfToken || window.state?.csrfToken || sessionStorage.getItem('mufinances.csrf'),
   });
 }
-

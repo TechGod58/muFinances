@@ -13,7 +13,10 @@
 
   function authHeaders() {
     const currentToken = token();
-    return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
+    const headers = currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
+    const csrfToken = sessionStorage.getItem('mufinances.csrf') || '';
+    if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+    return headers;
   }
 
   async function safeJson(response) {
@@ -25,7 +28,7 @@
   }
 
   async function apiGet(path) {
-    const response = await fetch(path, { headers: authHeaders() });
+    const response = await fetch(path, { headers: authHeaders(), credentials: 'same-origin' });
     if (!response.ok) throw new Error((await safeJson(response)).detail || 'Chat request failed.');
     return response.json();
   }
@@ -34,6 +37,7 @@
     const response = await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      credentials: 'same-origin',
       body: JSON.stringify(payload || {}),
     });
     if (!response.ok) throw new Error((await safeJson(response)).detail || 'Chat request failed.');
@@ -123,7 +127,7 @@
 
   async function refreshChat() {
     if (state.loading) return;
-    if (!token()) {
+    if (!token() && sessionStorage.getItem('mufinances.sessionMode') !== 'cookie') {
       renderMessages([]);
       setStatus('Sign in to muFinances in the main window first.');
       return;

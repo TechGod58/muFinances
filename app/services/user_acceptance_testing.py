@@ -74,6 +74,30 @@ UAT_ROLES = [
         ],
         'expected_result': 'IT admin can verify operations, security, and release readiness.',
     },
+    {
+        'role_key': 'auditor',
+        'title': 'Auditor UAT',
+        'steps': [
+            'Open auditor access workspace.',
+            'Review close evidence and audit packet.',
+            'Export auditor-facing records.',
+            'Confirm secure internal audit log remains inaccessible.',
+            'Verify retention and evidence metadata.',
+        ],
+        'expected_result': 'Auditor can inspect audit packets and evidence without direct access to secure internal audit logs.',
+    },
+    {
+        'role_key': 'integration_admin',
+        'title': 'Integration Admin UAT',
+        'steps': [
+            'Open integration staging workspace.',
+            'Preview mapped import rows.',
+            'Reject invalid rows and approve valid rows.',
+            'Review connector health, retry history, and source drill-back.',
+            'Confirm sync log and rejection evidence.',
+        ],
+        'expected_result': 'Integration admin can validate imports, resolve rejections, and prove connector traceability.',
+    },
 ]
 
 
@@ -133,6 +157,21 @@ def _ensure_tables() -> None:
                 FOREIGN KEY (run_id) REFERENCES uat_runs(id) ON DELETE CASCADE,
                 FOREIGN KEY (script_id) REFERENCES uat_test_scripts(id) ON DELETE CASCADE
             );
+            CREATE TABLE IF NOT EXISTS uat_retests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id INTEGER NOT NULL,
+                failure_id INTEGER NOT NULL,
+                script_id INTEGER NOT NULL,
+                role_key TEXT NOT NULL,
+                status TEXT NOT NULL,
+                retest_result TEXT NOT NULL,
+                evidence_json TEXT NOT NULL,
+                retested_by TEXT NOT NULL,
+                retested_at TEXT NOT NULL,
+                FOREIGN KEY (run_id) REFERENCES uat_runs(id) ON DELETE CASCADE,
+                FOREIGN KEY (failure_id) REFERENCES uat_failures(id) ON DELETE CASCADE,
+                FOREIGN KEY (script_id) REFERENCES uat_test_scripts(id) ON DELETE CASCADE
+            );
             CREATE TABLE IF NOT EXISTS uat_signoffs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id INTEGER NOT NULL,
@@ -145,6 +184,7 @@ def _ensure_tables() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_uat_scripts_run_role ON uat_test_scripts (run_id, role_key);
             CREATE INDEX IF NOT EXISTS idx_uat_results_run_role ON uat_test_results (run_id, role_key);
+            CREATE INDEX IF NOT EXISTS idx_uat_retests_run_role ON uat_retests (run_id, role_key);
             CREATE INDEX IF NOT EXISTS idx_uat_signoffs_run_role ON uat_signoffs (run_id, role_key);
             '''
         )
@@ -158,6 +198,7 @@ def status() -> dict[str, Any]:
         'scripts': int(db.fetch_one('SELECT COUNT(*) AS count FROM uat_test_scripts')['count']),
         'results': int(db.fetch_one('SELECT COUNT(*) AS count FROM uat_test_results')['count']),
         'failures': int(db.fetch_one('SELECT COUNT(*) AS count FROM uat_failures')['count']),
+        'retests': int(db.fetch_one('SELECT COUNT(*) AS count FROM uat_retests')['count']),
         'open_failures': int(db.fetch_one("SELECT COUNT(*) AS count FROM uat_failures WHERE status <> 'verified'")['count']),
         'signoffs': int(db.fetch_one('SELECT COUNT(*) AS count FROM uat_signoffs')['count']),
     }
@@ -168,13 +209,16 @@ def status() -> dict[str, Any]:
         'grants_script_ready': True,
         'executive_script_ready': True,
         'it_admin_script_ready': True,
+        'auditor_script_ready': True,
+        'integration_admin_script_ready': True,
         'failure_recording_ready': True,
         'fix_tracking_ready': True,
+        'retest_tracking_ready': True,
         'signoff_ready': True,
     }
     return {
-        'batch': 'B107',
-        'title': 'User Acceptance Testing',
+        'batch': 'B152',
+        'title': 'UAT Script Expansion',
         'complete': all(checks.values()),
         'checks': checks,
         'counts': counts,
@@ -202,12 +246,14 @@ def run_uat(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
     scripts = [_create_script(run_id, script) for script in UAT_ROLES]
     results = [_record_result(run_id, script, user) for script in scripts]
     failures = [_record_and_verify_failure(run_id, _script_by_role(scripts, 'department_planner'))]
+    retests = [_record_retest(run_id, failure, user) for failure in failures]
     signoffs = [_record_signoff(run_id, script, user, failures) for script in scripts]
     summary = {
         'role_count': len(UAT_ROLES),
         'script_count': len(scripts),
         'result_count': len(results),
         'failure_count': len(failures),
+        'retest_count': len(retests),
         'verified_failure_count': sum(1 for failure in failures if failure['status'] == 'verified'),
         'signoff_count': len(signoffs),
         'roles': [role['role_key'] for role in UAT_ROLES],
@@ -217,6 +263,7 @@ def run_uat(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
         'all_scripts_executed': all(result['status'] == 'passed' for result in results),
         'failures_recorded': bool(failures),
         'fixes_recorded': all(failure['fix_summary'] for failure in failures),
+        'retests_recorded': len(retests) == len(failures) and all(retest['status'] == 'passed' for retest in retests),
         'failures_verified': all(failure['status'] == 'verified' for failure in failures),
         'all_signoffs_recorded': len(signoffs) == len(UAT_ROLES) and all(signoff['status'] == 'signed' for signoff in signoffs),
     }
@@ -240,6 +287,7 @@ def get_run(run_id: int) -> dict[str, Any]:
     result['scripts'] = [_format_script(row) for row in db.fetch_all('SELECT * FROM uat_test_scripts WHERE run_id = ? ORDER BY id ASC', (run_id,))]
     result['results'] = [_format_result(row) for row in db.fetch_all('SELECT * FROM uat_test_results WHERE run_id = ? ORDER BY id ASC', (run_id,))]
     result['failures'] = db.fetch_all('SELECT * FROM uat_failures WHERE run_id = ? ORDER BY id ASC', (run_id,))
+    result['retests'] = [_format_retest(row) for row in db.fetch_all('SELECT * FROM uat_retests WHERE run_id = ? ORDER BY id ASC', (run_id,))]
     result['signoffs'] = db.fetch_all('SELECT * FROM uat_signoffs WHERE run_id = ? ORDER BY id ASC', (run_id,))
     result['complete'] = result['status'] == 'passed'
     return result
@@ -299,6 +347,29 @@ def _record_and_verify_failure(run_id: int, script: dict[str, Any]) -> dict[str,
     return db.fetch_one('SELECT * FROM uat_failures WHERE id = ?', (failure_id,))
 
 
+def _record_retest(run_id: int, failure: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    now = _now()
+    retest_id = db.execute(
+        '''
+        INSERT INTO uat_retests (
+            run_id, failure_id, script_id, role_key, status, retest_result,
+            evidence_json, retested_by, retested_at
+        ) VALUES (?, ?, ?, ?, 'passed', ?, ?, ?, ?)
+        ''',
+        (
+            run_id,
+            failure['id'],
+            failure['script_id'],
+            failure['role_key'],
+            'Retest passed after fix verification; no open user-facing blocker remains.',
+            json.dumps({'failure_id': failure['id'], 'fix_summary': failure['fix_summary'], 'verified': True}, sort_keys=True),
+            user['email'],
+            now,
+        ),
+    )
+    return _format_retest(db.fetch_one('SELECT * FROM uat_retests WHERE id = ?', (retest_id,)))
+
+
 def _record_signoff(run_id: int, script: dict[str, Any], user: dict[str, Any], failures: list[dict[str, Any]]) -> dict[str, Any]:
     role_failures = [failure for failure in failures if failure['role_key'] == script['role_key']]
     notes = 'Signed after verified fixes.' if role_failures else 'Signed with no open UAT issues.'
@@ -333,6 +404,14 @@ def _format_script(row: dict[str, Any] | None) -> dict[str, Any]:
 def _format_result(row: dict[str, Any] | None) -> dict[str, Any]:
     if row is None:
         raise RuntimeError('UAT result could not be reloaded.')
+    result = dict(row)
+    result['evidence'] = json.loads(result.pop('evidence_json') or '{}')
+    return result
+
+
+def _format_retest(row: dict[str, Any] | None) -> dict[str, Any]:
+    if row is None:
+        raise RuntimeError('UAT retest could not be reloaded.')
     result = dict(row)
     result['evidence'] = json.loads(result.pop('evidence_json') or '{}')
     return result
