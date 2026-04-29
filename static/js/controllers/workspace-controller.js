@@ -326,6 +326,25 @@
       .hero-actions {
         gap: 8px !important;
       }
+      .deck-footer {
+        isolation: isolate !important;
+        position: relative !important;
+        transform: translateZ(0) !important;
+        z-index: 10000 !important;
+      }
+      .deck-footer > button,
+      #${buttonId} {
+        pointer-events: auto !important;
+      }
+      #${buttonId} {
+        z-index: 10001 !important;
+      }
+      .command-deck-body nav,
+      .command-deck-body .brand-block,
+      .command-deck-body .command-controls {
+        position: relative !important;
+        z-index: 1 !important;
+      }
       .command-deck,
       .flow-command-deck,
       .command-panel,

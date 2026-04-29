@@ -11,6 +11,20 @@ Current router slices:
 - `app/routers/health.py`: public health probe.
 - `app/routers/auth.py`: local login, password-change enforcement, SSO bootstrap,
   SSO placeholders, and current-user profile.
+- `app/routers/security_admin.py`, `budget.py`, `ledger.py`, `reporting.py`,
+  `close.py`, `integrations.py`, `operations.py`, `ai.py`, `workflow.py`, and
+  `contracts.py`: authoritative router slices for their matching API domains.
+
+## B154 route retirement rule
+
+`app/main.py` still contains legacy route functions while the remaining service
+areas are retired in place. At startup, `_deduplicate_api_routes()` keeps the
+first registered API method/path and removes later duplicates from the runtime
+route table. Because router modules are included before legacy route functions,
+router-owned endpoints win over the older `app.main` definitions.
+
+New work should not add `@app.get`, `@app.post`, or other API route decorators
+to `app/main.py`. Add a router module or extend the matching router instead.
 
 ## Service layer
 

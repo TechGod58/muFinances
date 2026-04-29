@@ -34,6 +34,23 @@ def owner_for(path: str, method: str = 'GET') -> str:
     raise AssertionError(f'No route found for {method} {path}')
 
 
+def test_api_runtime_route_table_has_no_duplicate_method_paths() -> None:
+    seen: set[tuple[str, str]] = set()
+    duplicates: list[tuple[str, str]] = []
+    for route in app.routes:
+        methods = getattr(route, 'methods', set()) or set()
+        path = getattr(route, 'path', '')
+        if not path.startswith('/api'):
+            continue
+        for method in methods - {'HEAD', 'OPTIONS'}:
+            key = (method, path)
+            if key in seen:
+                duplicates.append(key)
+            seen.add(key)
+    assert duplicates == []
+    assert app.state.api_route_deduplication['removed_count'] > 0
+
+
 def test_core_financial_domains_are_mounted_from_router_modules() -> None:
     assert owner_for('/api/security/status') == 'app.routers.security_admin'
     assert owner_for('/api/security/users') == 'app.routers.security_admin'

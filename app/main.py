@@ -6535,7 +6535,7 @@ def foundation_ledger(
     request: Request,
     scenario_id: int = Query(..., ge=1),
     include_reversed: bool = Query(False),
-    limit: int = Query(500, ge=1, le=5000),
+    limit: int = Query(5000, ge=1, le=5000),
 ) -> dict[str, Any]:
     scenario = db.fetch_one('SELECT id FROM scenarios WHERE id = ?', (scenario_id,))
     if scenario is None:
@@ -6735,7 +6735,7 @@ def root() -> FileResponse:
 @app.get('/api/bootstrap')
 def bootstrap(request: Request) -> dict[str, Any]:
     scenarios = get_scenarios()
-    active_scenario = scenarios[0] if scenarios else None
+    active_scenario = next((scenario for scenario in scenarios if scenario.get('status') != 'evidence'), None)
     scenario_id = active_scenario['id'] if active_scenario else None
     return {
         'scenarios': scenarios,
@@ -6776,6 +6776,40 @@ def roadmap() -> dict[str, Any]:
             'self-service report builder',
         ],
     }
+
+
+def _deduplicate_api_routes() -> None:
+    """Keep router-owned API paths authoritative while legacy routes retire."""
+    seen: set[tuple[str, str]] = set()
+    kept = []
+    removed: list[dict[str, Any]] = []
+    for route in app.router.routes:
+        path = getattr(route, 'path', '')
+        methods = set(getattr(route, 'methods', set()) or set())
+        api_methods = {method for method in methods if method not in {'HEAD', 'OPTIONS'}}
+        if not path.startswith('/api') or not api_methods:
+            kept.append(route)
+            continue
+        keys = {(method, path) for method in api_methods}
+        if keys.issubset(seen):
+            removed.append({
+                'path': path,
+                'methods': sorted(api_methods),
+                'endpoint': getattr(getattr(route, 'endpoint', None), '__name__', ''),
+                'module': getattr(getattr(route, 'endpoint', None), '__module__', ''),
+            })
+            continue
+        kept.append(route)
+        seen.update(keys)
+    app.router.routes = kept
+    app.state.api_route_deduplication = {
+        'removed_count': len(removed),
+        'removed': removed,
+        'authoritative_policy': 'first_registered_route_wins',
+    }
+
+
+_deduplicate_api_routes()
 
 
 app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')

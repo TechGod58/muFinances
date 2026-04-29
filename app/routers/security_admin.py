@@ -45,6 +45,11 @@ from app.services.manchester_identity_live_proof import (
     run_live_proof as run_manchester_identity_live_proof,
     status as manchester_identity_live_proof_status,
 )
+from app.services.manchester_identity_activation_proof import (
+    list_runs as list_manchester_identity_activation_runs,
+    run_activation_proof as run_manchester_identity_activation_proof,
+    status as manchester_identity_activation_proof_status,
+)
 from app.services.security_activation_certification import (
     list_runs as list_security_activation_certification_runs,
     run_certification as run_security_activation_certification,
@@ -177,6 +182,25 @@ def security_manchester_identity_live_proof_runs(request: Request, limit: int = 
 def security_run_manchester_identity_live_proof(payload: dict[str, Any], request: Request) -> dict[str, Any]:
     require(request, 'security.manage')
     return run_manchester_identity_live_proof(payload, request.state.user)
+
+
+@router.get('/api/security/manchester-identity-activation-proof/status')
+def security_manchester_identity_activation_proof_status(request: Request) -> dict[str, Any]:
+    require(request, 'security.manage')
+    return manchester_identity_activation_proof_status()
+
+
+@router.get('/api/security/manchester-identity-activation-proof/runs')
+def security_manchester_identity_activation_proof_runs(request: Request, limit: int = 50) -> dict[str, Any]:
+    require(request, 'security.manage')
+    rows = list_manchester_identity_activation_runs(limit)
+    return {'count': len(rows), 'runs': rows}
+
+
+@router.post('/api/security/manchester-identity-activation-proof/run')
+def security_run_manchester_identity_activation_proof(payload: dict[str, Any], request: Request) -> dict[str, Any]:
+    require(request, 'security.manage')
+    return run_manchester_identity_activation_proof(payload, request.state.user)
 
 
 @router.get('/api/security/impersonations')

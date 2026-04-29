@@ -172,7 +172,7 @@ def foundation_ledger(
     request: Request,
     scenario_id: int = Query(..., ge=1),
     include_reversed: bool = Query(False),
-    limit: int = Query(500, ge=1, le=5000),
+    limit: int = Query(5000, ge=1, le=5000),
 ) -> dict[str, Any]:
     scenario = db.fetch_one('SELECT id FROM scenarios WHERE id = ?', (scenario_id,))
     if scenario is None:
