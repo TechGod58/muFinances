@@ -1,0 +1,50 @@
+[
+  {
+    "pack_key": "b143-campus-core",
+    "name": "B143 campus golden finance pack",
+    "period_start": "2026-07",
+    "period_end": "2026-07",
+    "ledger": [
+      {"department_code": "SCI", "fund_code": "GEN", "account_code": "TUITION", "period": "2026-07", "amount": 1000.0, "ledger_basis": "actual"},
+      {"department_code": "OPS", "fund_code": "GEN", "account_code": "SALARY", "period": "2026-07", "amount": -400.0, "ledger_basis": "actual"},
+      {"department_code": "OPS", "fund_code": "GEN", "account_code": "SUPPLIES", "period": "2026-07", "amount": -100.0, "ledger_basis": "actual"},
+      {"department_code": "SCI", "fund_code": "GEN", "account_code": "CASH", "period": "2026-07", "amount": 600.0, "ledger_basis": "actual"},
+      {"department_code": "OPS", "fund_code": "GEN", "account_code": "AP", "period": "2026-07", "amount": -150.0, "ledger_basis": "actual"},
+      {"department_code": "SCI", "fund_code": "GEN", "account_code": "CAPITAL", "period": "2026-07", "amount": -200.0, "ledger_basis": "actual"},
+      {"department_code": "OPS", "fund_code": "GEN", "account_code": "DEBT", "period": "2026-07", "amount": 50.0, "ledger_basis": "actual"},
+      {"department_code": "OPS", "fund_code": "GEN", "account_code": "TRANSFER", "period": "2026-07", "amount": 100.0, "ledger_basis": "budget"},
+      {"department_code": "SCI", "fund_code": "GEN", "account_code": "TUITION", "period": "2026-07", "amount": 1100.0, "ledger_basis": "forecast"}
+    ],
+    "grant_budget": {
+      "grant_code": "B143-GRANT",
+      "department_code": "SCI",
+      "sponsor": "NSF",
+      "start_period": "2026-07",
+      "end_period": "2027-06",
+      "total_award": 500.0,
+      "direct_cost_budget": 420.0,
+      "indirect_cost_rate": 0.1,
+      "spent_to_date": 125.0,
+      "status": "active"
+    },
+    "reconciliation": {"ledger_total": 600.0, "source_total": 600.0, "tolerance": 0.01},
+    "close": {"tasks_total": 3, "tasks_complete": 3},
+    "consolidation": {
+      "entity_totals": {"MAIN": 2000.0, "AUX": 300.0},
+      "eliminations": [{"amount": -100.0}],
+      "expected_net": 2200.0
+    },
+    "fx_translation": {"amount": 100.0, "rate": 1.25, "expected": 125.0},
+    "allocation": {"pool_amount": 400.0, "drivers": {"SCI": 3, "OPS": 1}, "expected": {"SCI": 300.0, "OPS": 100.0}},
+    "expected": {
+      "financial_statement": {"Operating revenue": 2850.0, "Operating expense": -850.0, "Change in net position": 2000.0},
+      "balance_sheet": {"Assets": 600.0, "Liabilities": -100.0, "Net position": 2200.0},
+      "cash_flow": {"Operating cash flow": 2150.0, "Capital cash flow": -200.0, "Financing cash flow": 50.0, "Net cash flow": 2000.0},
+      "fund_report": {"GEN": 2000.0},
+      "departmental_pl": {"SCI": {"revenue": 2700.0, "expense": -200.0, "net": 2500.0}, "OPS": {"revenue": 150.0, "expense": -650.0, "net": -500.0}},
+      "variance": {"SCI:TUITION": {"actual": 1000.0, "budget": 0.0, "forecast": 1100.0}, "OPS:TRANSFER": {"actual": 0.0, "budget": 100.0, "forecast": 0.0}},
+      "grant_report": {"B143-GRANT": {"remaining_award": 375.0, "burn_rate": 0.25}},
+      "secure_audit": {"minimum_financial_events": 9}
+    }
+  }
+]

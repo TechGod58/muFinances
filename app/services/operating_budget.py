@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app import db
+from app.contracts.financial import BudgetSubmissionContract, OperatingBudgetLineContract
 from app.services.foundation import append_ledger_entry
 from app.services.security import allowed_codes
 
@@ -36,6 +37,7 @@ def status() -> dict[str, Any]:
 
 
 def create_submission(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    payload = BudgetSubmissionContract.model_validate(payload).model_dump()
     _check_department(user, payload['department_code'])
     now = _now()
     submission_id = db.execute(
@@ -122,6 +124,7 @@ def reject_submission(submission_id: int, user: dict[str, Any], note: str = '') 
 
 
 def add_budget_line(submission_id: int, payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    payload = OperatingBudgetLineContract.model_validate(payload).model_dump()
     submission = get_submission(submission_id, user)
     if submission['status'] == 'approved':
         raise ValueError('Approved submissions cannot be edited.')

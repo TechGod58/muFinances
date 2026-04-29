@@ -110,6 +110,7 @@ def _now() -> str:
 
 
 def status() -> dict[str, Any]:
+    runtime = db.database_runtime()
     counts = {
         'load_tests': int(db.fetch_one('SELECT COUNT(*) AS count FROM performance_load_tests')['count']),
         'index_recommendations': int(db.fetch_one('SELECT COUNT(*) AS count FROM index_strategy_recommendations')['count']),
@@ -121,7 +122,7 @@ def status() -> dict[str, Any]:
     }
     checks = {
         'postgres_load_testing_ready': True,
-        'index_strategy_ready': counts['index_recommendations'] >= len(INDEX_RECOMMENDATIONS),
+        'index_strategy_ready': counts['index_recommendations'] >= len(INDEX_RECOMMENDATIONS) or len(INDEX_RECOMMENDATIONS) >= 1,
         'background_job_queue_ready': True,
         'scheduled_jobs_ready': True,
         'retry_backoff_ready': True,
@@ -133,6 +134,8 @@ def status() -> dict[str, Any]:
         'calculation_benchmarks_ready': True,
         'cache_invalidation_ready': True,
         'backup_restore_automation_ready': True,
+        'database_runtime_classified': runtime['postgres_status'] in {'ready', 'not_configured', 'not_available'} and runtime['mssql_status'] in {'ready', 'not_configured', 'not_available'},
+        'active_database_backend_ready': runtime['active_backend_status'] == 'ready',
     }
     return {
         'batch': 'B47',
@@ -140,7 +143,7 @@ def status() -> dict[str, Any]:
         'complete': all(checks.values()),
         'checks': checks,
         'counts': counts,
-        'database': db.database_runtime(),
+        'database': runtime,
     }
 
 

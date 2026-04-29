@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app import db
+from app.contracts.financial import ImportBatchContract
 from app.services.foundation import append_ledger_entry, summary_by_dimensions
 
 
@@ -411,6 +412,7 @@ def get_connector(connector_key: str) -> dict[str, Any]:
 
 
 def run_import(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    payload = ImportBatchContract.model_validate(payload).model_dump()
     now = _now()
     connector = get_connector(payload['connector_key'])
     adapter = _adapter(connector['config'].get('adapter_key') or _default_adapter(connector['system_type']))

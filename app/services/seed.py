@@ -3,11 +3,15 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from app import db
+from app.services.seed_demo_enforcement import assert_seed_demo_safe, seed_allowed
 
 
 def seed_if_empty() -> None:
+    assert_seed_demo_safe()
     existing = db.fetch_one('SELECT COUNT(*) AS count FROM scenarios')
     if existing and existing['count'] > 0:
+        return
+    if not seed_allowed():
         return
 
     now = datetime.now(UTC).isoformat()

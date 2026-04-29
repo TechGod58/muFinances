@@ -31,7 +31,7 @@ def test_user_acceptance_testing_scripts_failures_fixes_and_signoff() -> None:
 
     status = client.get('/api/user-acceptance/status', headers=headers)
     assert status.status_code == 200
-    assert status.json()['batch'] == 'B107'
+    assert status.json()['batch'] == 'B152'
     assert status.json()['complete'] is True
 
     run = client.post('/api/user-acceptance/run', headers=headers, json={'run_key': 'b107-regression'})
@@ -39,19 +39,21 @@ def test_user_acceptance_testing_scripts_failures_fixes_and_signoff() -> None:
     payload = run.json()
     assert payload['status'] == 'passed'
     assert payload['complete'] is True
-    assert payload['summary']['role_count'] == 6
-    assert payload['summary']['script_count'] == 6
-    assert payload['summary']['result_count'] == 6
+    assert payload['summary']['role_count'] == 8
+    assert payload['summary']['script_count'] == 8
+    assert payload['summary']['result_count'] == 8
     assert payload['summary']['failure_count'] == 1
+    assert payload['summary']['retest_count'] == 1
     assert payload['summary']['verified_failure_count'] == 1
-    assert payload['summary']['signoff_count'] == 6
+    assert payload['summary']['signoff_count'] == 8
 
     roles = {script['role_key'] for script in payload['scripts']}
-    assert roles == {'budget_office', 'controller', 'department_planner', 'grants', 'executive', 'it_admin'}
+    assert roles == {'budget_office', 'controller', 'department_planner', 'grants', 'executive', 'it_admin', 'auditor', 'integration_admin'}
     assert all(len(script['steps']) >= 4 for script in payload['scripts'])
     assert all(result['status'] == 'passed' for result in payload['results'])
     assert payload['failures'][0]['status'] == 'verified'
     assert payload['failures'][0]['fix_summary']
+    assert payload['retests'][0]['status'] == 'passed'
     assert all(signoff['status'] == 'signed' for signoff in payload['signoffs'])
 
     detail = client.get(f"/api/user-acceptance/runs/{payload['id']}", headers=headers)

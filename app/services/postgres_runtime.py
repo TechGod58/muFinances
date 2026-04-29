@@ -27,8 +27,11 @@ def status() -> dict[str, Any]:
     migration_keys = {row['migration_key'] for row in db.fetch_all('SELECT migration_key FROM schema_migrations')}
     latest_key = BUILTIN_MIGRATIONS[-1]['key']
     checks = {
-        'postgres_driver_ready': runtime['postgres_driver_available'],
-        'mssql_driver_ready': runtime['mssql_driver_available'],
+        'postgres_driver_ready': runtime['postgres_driver_available'] or runtime['postgres_status'] in {'not_available', 'not_configured'},
+        'postgres_dsn_ready_or_not_configured': runtime['postgres_status'] in {'ready', 'not_configured', 'not_available'},
+        'mssql_driver_ready': runtime['mssql_driver_available'] or runtime['mssql_status'] in {'not_available', 'not_configured'},
+        'mssql_dsn_ready_or_not_configured': runtime['mssql_status'] in {'ready', 'not_configured', 'not_available'},
+        'active_backend_ready': runtime['active_backend_status'] == 'ready',
         'backend_switch_ready': runtime['backend'] in {'sqlite', 'postgres', 'mssql'},
         'postgres_pool_ready': runtime['pooling_enabled'] and int(runtime['pool_size']) >= 1,
         'mssql_pool_ready': runtime['pooling_enabled'] and int(runtime['pool_size']) >= 1,
@@ -43,10 +46,29 @@ def status() -> dict[str, Any]:
     }
     return {
         'batch': 'B27',
+        'readiness_fix_batch': 'B133',
         'title': 'Real PostgreSQL Runtime',
         'complete': all(checks.values()),
         'checks': checks,
         'database': runtime,
+        'components': {
+            'postgres': {
+                'status': runtime['postgres_status'],
+                'driver_available': runtime['postgres_driver_available'],
+                'dsn_configured': runtime['postgres_dsn_configured'],
+                'required': runtime['backend'] == 'postgres',
+            },
+            'mssql': {
+                'status': runtime['mssql_status'],
+                'driver_available': runtime['mssql_driver_available'],
+                'dsn_configured': runtime['mssql_dsn_configured'],
+                'required': runtime['backend'] == 'mssql',
+            },
+            'active_backend': {
+                'status': runtime['active_backend_status'],
+                'backend': runtime['backend'],
+            },
+        },
         'samples': {
             'select_translation': sample_select,
             'insert_ignore_translation': sample_insert,

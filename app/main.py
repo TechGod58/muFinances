@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hmac
 import os
 import time
 import uuid
@@ -8,13 +9,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import db
 from app.routers import auth, health
+from app.routers import ai, budget, close, contracts, integrations, ledger, operations, reporting, security_admin, workflow
 from app.schemas import (
     AuditLogOut,
     ApprovalAction,
@@ -23,6 +25,7 @@ from app.schemas import (
     AIExplanationDecision,
     AIPlanningAgentDecision,
     AIPlanningAgentRunCreate,
+    AIProviderLiveGuardrailRunCreate,
     AIProductionGuardrailRunCreate,
     AdminImpersonationCreate,
     AutomationDecisionCreate,
@@ -63,6 +66,7 @@ from app.schemas import (
     ConsolidationEntityCreate,
     ConsolidationSettingCreate,
     ConnectorCreate,
+    ConnectorLiveTrialRunCreate,
     ConnectorAuthFlowCreate,
     ConnectorTestModeCreate,
     ConfigSnapshotCreate,
@@ -118,6 +122,7 @@ from app.schemas import (
     MasterDataChangeCreate,
     MasterDataMappingCreate,
     MetadataApprovalCreate,
+    MultiUserPilotCycleRunCreate,
     MigrationRollbackPlanCreate,
     ModelFormulaCreate,
     ModelScenarioBranchCreate,
@@ -129,6 +134,7 @@ from app.schemas import (
     ParityGapReviewRunCreate,
     PermissionSimulationCreate,
     OfficeCellCommentCreate,
+    OfficeAdoptionLiveProofRunCreate,
     PeriodCloseCalendarCreate,
     PeriodLockAction,
     PaperTradeCreate,
@@ -138,8 +144,11 @@ from app.schemas import (
     PerformanceLoadTestCreate,
     PlanLineItemCreate,
     PlanLineItemOut,
+    PilotDefectUIPolishRunCreate,
     PilotDeploymentRunCreate,
     ProductionDataCutoverRunCreate,
+    ProductionScaleBenchmarkRunCreate,
+    ProphixFinalGapReviewRunCreate,
     ProductionReleaseCandidateRunCreate,
     CampusDataValidationRunCreate,
     RealConnectorActivationRunCreate,
@@ -394,6 +403,11 @@ from app.services.consolidation_certification import (
     run_certification as run_consolidation_certification,
     status as consolidation_certification_status,
 )
+from app.services.consolidation_golden_cases import (
+    list_runs as list_consolidation_golden_case_runs,
+    run_golden_case as run_consolidation_golden_case,
+    status as consolidation_golden_case_status,
+)
 from app.services.forecasting_accuracy_proof import (
     list_runs as list_forecasting_accuracy_proof_runs,
     run_proof as run_forecasting_accuracy_proof,
@@ -403,6 +417,15 @@ from app.services.reporting_pixel_polish_certification import (
     list_runs as list_reporting_pixel_polish_runs,
     run_certification as run_reporting_pixel_polish,
     status as reporting_pixel_polish_status,
+)
+from app.services.financial_statement_accuracy_certification import (
+    accuracy_status as financial_statement_accuracy_status,
+    golden_status as golden_financial_test_pack_status,
+    list_accuracy_runs as list_financial_statement_accuracy_runs,
+    list_golden_runs as list_golden_financial_test_pack_runs,
+    load_packs as load_golden_financial_test_packs,
+    run_accuracy_certification as run_financial_statement_accuracy_certification,
+    run_golden_packs as run_golden_financial_test_packs,
 )
 from app.services.profitability import (
     before_after_allocation_comparison,
@@ -530,6 +553,11 @@ from app.services.real_connector_activation import (
     run_activation as run_real_connector_activation,
     status as real_connector_activation_status,
 )
+from app.services.connector_live_trial import (
+    list_runs as list_connector_live_trial_runs,
+    run_trial as run_connector_live_trial,
+    status as connector_live_trial_status,
+)
 from app.services.governed_automation import (
     ai_guardrails_status,
     approve_agent_action,
@@ -550,6 +578,11 @@ from app.services.ai_production_guardrails import (
     list_runs as list_ai_production_guardrail_runs,
     run_certification as run_ai_production_guardrails,
     status as ai_production_guardrails_status,
+)
+from app.services.ai_provider_live_guardrails import (
+    list_runs as list_ai_provider_live_guardrail_runs,
+    run_live_guardrails as run_ai_provider_live_guardrails,
+    status as ai_provider_live_guardrails_status,
 )
 from app.services.ai_explainability import (
     approve_explanation as approve_ai_explanation,
@@ -599,6 +632,15 @@ from app.services.data_hub import (
     status as data_hub_status,
     upsert_mapping as upsert_master_data_mapping,
     workspace as data_hub_workspace,
+)
+from app.services.coa_governance import (
+    list_accounts as list_coa_governance_accounts,
+    list_statement_mappings as list_coa_statement_mappings,
+    list_validation_runs as list_coa_validation_runs,
+    seed_default_governance as seed_coa_governance,
+    status as coa_governance_status,
+    upsert_account_rule as upsert_coa_governance_account,
+    validate_chart_of_accounts,
 )
 from app.services.workspaces import role_workspaces, status as workspace_status
 from app.services.workflow_designer import (
@@ -757,6 +799,11 @@ from app.services.office_interop import (
     run_office_adoption_proof,
     status as office_interop_status,
 )
+from app.services.office_adoption_live_proof import (
+    list_runs as list_office_adoption_live_proof_runs,
+    run_live_proof as run_office_adoption_live_proof,
+    status as office_adoption_live_proof_status,
+)
 from app.services.deployment_operations import (
     create_operations_backup,
     list_operational_checks,
@@ -823,10 +870,21 @@ from app.services.enterprise_scale_benchmark import (
     run_enterprise_scale_benchmark,
     status as enterprise_scale_benchmark_status,
 )
+from app.services.production_scale_benchmark import (
+    get_run as get_production_scale_benchmark_run,
+    list_runs as list_production_scale_benchmark_runs,
+    run_benchmark as run_production_scale_benchmark,
+    status as production_scale_benchmark_status,
+)
 from app.services.campus_data_validation import (
     list_validation_runs as list_campus_data_validation_runs,
     run_validation as run_campus_data_validation,
     status as campus_data_validation_status,
+)
+from app.services.real_data_cutover_reconciliation import (
+    list_runs as list_real_data_cutover_reconciliation_runs,
+    run_cutover_reconciliation as run_real_data_cutover_reconciliation,
+    status as real_data_cutover_reconciliation_status,
 )
 from app.services.parallel_cubed_engine import (
     cpu_topology as parallel_cubed_cpu_topology,
@@ -873,11 +931,35 @@ from app.services.pilot_deployment import (
     run_pilot_deployment,
     status as pilot_deployment_status,
 )
+from app.services.multi_user_pilot_cycle import (
+    get_run as get_multi_user_pilot_cycle_run,
+    list_runs as list_multi_user_pilot_cycle_runs,
+    run_cycle as run_multi_user_pilot_cycle,
+    status as multi_user_pilot_cycle_status,
+)
+from app.services.pilot_defect_ui_polish import (
+    get_run as get_pilot_defect_ui_polish_run,
+    list_runs as list_pilot_defect_ui_polish_runs,
+    run_final_polish as run_pilot_defect_ui_polish,
+    status as pilot_defect_ui_polish_status,
+)
 from app.services.parity_gap_review import (
     get_run as get_parity_gap_review_run,
     list_runs as list_parity_gap_review_runs,
     run_parity_review,
     status as parity_gap_review_status,
+)
+from app.services.minimum_viable_prophix_parity_matrix import (
+    get_run as get_minimum_viable_parity_matrix_run,
+    list_runs as list_minimum_viable_parity_matrix_runs,
+    run_matrix as run_minimum_viable_parity_matrix,
+    status as minimum_viable_parity_matrix_status,
+)
+from app.services.prophix_final_gap_review import (
+    get_run as get_prophix_final_gap_review_run,
+    list_runs as list_prophix_final_gap_review_runs,
+    run_final_gap_review as run_prophix_final_gap_review,
+    status as prophix_final_gap_review_status,
 )
 from app.services.production_release_candidate import (
     get_run as get_production_release_candidate_run,
@@ -904,6 +986,12 @@ from app.services.operations_readiness import (
     run_readiness as run_operations_readiness,
     status as operations_readiness_status,
     upsert_alert_route as upsert_operations_alert_route,
+)
+from app.services.auditor_access_model import (
+    auditor_workspace as auditor_access_workspace,
+    export_auditor_records,
+    list_access_records as list_auditor_access_records,
+    status as auditor_access_status,
 )
 from app.services.disaster_recovery_release_governance import (
     list_runs as list_disaster_recovery_release_runs,
@@ -952,6 +1040,7 @@ from app.services.foundation import (
 )
 from app.services.parallel_cubed import batches_as_dicts, finance_flow
 from app.services.seed import seed_if_empty
+from app.services.seed_demo_enforcement import assert_seed_demo_safe, status as seed_demo_enforcement_status
 from app.services.operating_budget import (
     add_budget_line,
     approve_submission,
@@ -967,6 +1056,8 @@ from app.services.operating_budget import (
     submit_submission,
 )
 from app.services.security import (
+    CSRF_COOKIE_NAME,
+    SESSION_COOKIE_NAME,
     activate_security_controls,
     certify_access_review,
     create_user,
@@ -992,6 +1083,8 @@ from app.services.security import (
     upsert_sod_policy,
     upsert_sso_production_setting,
     user_from_token,
+    encryption_status,
+    migrate_encrypted_fields,
 )
 from app.services.security_activation_certification import (
     list_runs as list_security_activation_certification_runs,
@@ -1004,13 +1097,26 @@ from app.services.access_guard import (
     assert_network_request_allowed,
 )
 
+def _allowed_cors_origins() -> list[str]:
+    configured = os.getenv('CAMPUS_FPM_ALLOWED_ORIGINS', '')
+    origins = [origin.strip() for origin in configured.split(',') if origin.strip()]
+    app_env = os.getenv('CAMPUS_FPM_ENV', os.getenv('APP_ENV', 'development')).lower()
+    if origins:
+        if app_env in {'prod', 'production'} and '*' in origins:
+            raise RuntimeError('CAMPUS_FPM_ALLOWED_ORIGINS cannot include * in production.')
+        return origins
+    if app_env in {'prod', 'production'}:
+        raise RuntimeError('CAMPUS_FPM_ALLOWED_ORIGINS must be set in production.')
+    return ['http://localhost:3200', 'http://127.0.0.1:3200']
+
+
 app = FastAPI(title='Campus FPM Base', version='0.1.0')
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=_allowed_cors_origins(),
     allow_credentials=True,
-    allow_methods=['*'],
-    allow_headers=['*'],
+    allow_methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allow_headers=['Authorization', 'Content-Type', 'X-CSRF-Token', 'X-Trace-Id', 'X-Request-Id'],
 )
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / 'static'
@@ -1018,6 +1124,7 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / 'static'
 
 def init_application() -> None:
     assert_production_security_ready()
+    assert_seed_demo_safe()
     db.init_db()
     ensure_foundation_ready()
     ensure_security_ready()
@@ -1030,6 +1137,16 @@ def init_application() -> None:
 init_application()
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(security_admin.router)
+app.include_router(budget.router)
+app.include_router(ledger.router)
+app.include_router(reporting.router)
+app.include_router(close.router)
+app.include_router(integrations.router)
+app.include_router(operations.router)
+app.include_router(ai.router)
+app.include_router(workflow.router)
+app.include_router(contracts.router)
 
 PUBLIC_API_PATHS = {
     '/api/health',
@@ -1048,6 +1165,40 @@ PASSWORD_CHANGE_ALLOWED_PATHS = {
     '/api/auth/password',
 }
 
+UNSAFE_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
+RATE_LIMIT_PER_MINUTE = int(os.getenv('CAMPUS_FPM_RATE_LIMIT_PER_MINUTE', '100000'))
+LOGIN_RATE_LIMIT_PER_MINUTE = int(os.getenv('CAMPUS_FPM_LOGIN_RATE_LIMIT_PER_MINUTE', '100000'))
+_RATE_LIMIT_BUCKETS: dict[tuple[str, str], list[float]] = {}
+
+
+def _client_host(request: Request) -> str:
+    forwarded = request.headers.get('x-forwarded-for', '')
+    if forwarded:
+        return forwarded.split(',', 1)[0].strip()
+    return request.client.host if request.client else 'unknown'
+
+
+def _rate_limit_exceeded(request: Request) -> bool:
+    if RATE_LIMIT_PER_MINUTE <= 0:
+        return False
+    now = time.time()
+    window_start = now - 60
+    path_group = 'login' if request.url.path == '/api/auth/login' else 'api'
+    limit = LOGIN_RATE_LIMIT_PER_MINUTE if path_group == 'login' else RATE_LIMIT_PER_MINUTE
+    key = (_client_host(request), path_group)
+    bucket = [stamp for stamp in _RATE_LIMIT_BUCKETS.get(key, []) if stamp >= window_start]
+    bucket.append(now)
+    _RATE_LIMIT_BUCKETS[key] = bucket
+    return len(bucket) > limit
+
+
+def _csrf_invalid(request: Request, used_cookie_session: bool) -> bool:
+    if not used_cookie_session or request.method.upper() not in UNSAFE_METHODS:
+        return False
+    header_token = request.headers.get('x-csrf-token', '')
+    cookie_token = request.cookies.get(CSRF_COOKIE_NAME, '')
+    return not header_token or not cookie_token or not hmac.compare_digest(header_token, cookie_token)
+
 
 @app.middleware('http')
 async def require_api_auth(request: Request, call_next):
@@ -1064,10 +1215,18 @@ async def require_api_auth(request: Request, call_next):
     path = request.url.path
     response = None
     try:
-        if path.startswith('/api') and path not in PUBLIC_API_PATHS:
+        if path.startswith('/api') and _rate_limit_exceeded(request):
+            response = JSONResponse(status_code=429, content={'detail': 'Rate limit exceeded.', 'trace_id': trace_id})
+        if response is None and path.startswith('/api') and path not in PUBLIC_API_PATHS:
             auth_header = request.headers.get('authorization', '')
             scheme, _, token = auth_header.partition(' ')
+            used_cookie_session = False
             if scheme.lower() != 'bearer' or not token:
+                token = request.cookies.get(SESSION_COOKIE_NAME, '')
+                used_cookie_session = bool(token)
+            if used_cookie_session and _csrf_invalid(request, used_cookie_session):
+                response = JSONResponse(status_code=403, content={'detail': 'CSRF validation failed.', 'trace_id': trace_id})
+            elif not token:
                 sso_email = request.headers.get('x-mufinances-sso-email')
                 trusted_result = trusted_header_login(sso_email) if sso_email else None
                 if trusted_result is not None:
@@ -1114,6 +1273,8 @@ def _with_security_headers(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Referrer-Policy'] = 'same-origin'
     response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+    response.headers['Cross-Origin-Resource-Policy'] = 'same-origin'
     response.headers['Cache-Control'] = 'no-store'
     app_env = os.getenv('CAMPUS_FPM_ENV', os.getenv('APP_ENV', 'development')).lower()
     if app_env in {'prod', 'production'}:
@@ -1134,6 +1295,12 @@ def accessibility_status_endpoint() -> dict[str, Any]:
 def production_ops_status_endpoint(request: Request) -> dict[str, Any]:
     _require(request, 'operations.manage')
     return production_operations_status()
+
+
+@app.get('/api/production-ops/seed-demo-enforcement/status')
+def production_ops_seed_demo_enforcement_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return seed_demo_enforcement_status()
 
 
 @app.get('/api/production-ops/application-logs')
@@ -1237,6 +1404,37 @@ def observability_backup_restore_drills_endpoint(request: Request, limit: int = 
 def admin_production_readiness_dashboard_endpoint(request: Request) -> dict[str, Any]:
     _require(request, 'operations.manage')
     return production_readiness_dashboard()
+
+
+@app.get('/api/auditor-access/status')
+def auditor_access_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'reports.read')
+    return auditor_access_status()
+
+
+@app.get('/api/auditor-access/workspace')
+def auditor_access_workspace_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'reports.read')
+    try:
+        return auditor_access_workspace(request.state.user)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@app.post('/api/auditor-access/export')
+def auditor_access_export_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'reports.read')
+    try:
+        return export_auditor_records(request.state.user)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@app.get('/api/auditor-access/records')
+def auditor_access_records_endpoint(request: Request, limit: int = Query(100, ge=1, le=500)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_auditor_access_records(limit)
+    return {'count': len(rows), 'access_records': rows}
 
 
 @app.get('/api/operations-readiness/status')
@@ -1468,6 +1666,68 @@ def pilot_deployment_run_create_endpoint(payload: PilotDeploymentRunCreate, requ
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@app.get('/api/multi-user-pilot-cycle/status')
+def multi_user_pilot_cycle_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return multi_user_pilot_cycle_status()
+
+
+@app.get('/api/multi-user-pilot-cycle/runs')
+def multi_user_pilot_cycle_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_multi_user_pilot_cycle_runs(limit)
+    return {'count': len(rows), 'pilot_cycles': rows}
+
+
+@app.get('/api/multi-user-pilot-cycle/runs/{run_id}')
+def multi_user_pilot_cycle_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_multi_user_pilot_cycle_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/multi-user-pilot-cycle/run')
+def multi_user_pilot_cycle_run_create_endpoint(payload: MultiUserPilotCycleRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_multi_user_pilot_cycle(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/ui/pilot-defect-polish/status')
+def pilot_defect_ui_polish_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return pilot_defect_ui_polish_status()
+
+
+@app.get('/api/ui/pilot-defect-polish/runs')
+def pilot_defect_ui_polish_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_pilot_defect_ui_polish_runs(limit)
+    return {'count': len(rows), 'polish_runs': rows}
+
+
+@app.get('/api/ui/pilot-defect-polish/runs/{run_id}')
+def pilot_defect_ui_polish_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_pilot_defect_ui_polish_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/ui/pilot-defect-polish/run')
+def pilot_defect_ui_polish_run_create_endpoint(payload: PilotDefectUIPolishRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_pilot_defect_ui_polish(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.get('/api/parity-gap-review/status')
 def parity_gap_review_status_endpoint(request: Request) -> dict[str, Any]:
     _require(request, 'operations.manage')
@@ -1495,6 +1755,65 @@ def parity_gap_review_run_create_endpoint(payload: ParityGapReviewRunCreate, req
     _require(request, 'operations.manage')
     try:
         return run_parity_review(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/parity/minimum-viable/status')
+def minimum_viable_parity_matrix_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return minimum_viable_parity_matrix_status()
+
+
+@app.get('/api/parity/minimum-viable/runs')
+def minimum_viable_parity_matrix_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_minimum_viable_parity_matrix_runs(limit)
+    return {'count': len(rows), 'minimum_viable_parity_runs': rows}
+
+
+@app.get('/api/parity/minimum-viable/runs/{run_id}')
+def minimum_viable_parity_matrix_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_minimum_viable_parity_matrix_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/parity/minimum-viable/run')
+def minimum_viable_parity_matrix_run_create_endpoint(request: Request, payload: dict[str, Any] | None = Body(default=None)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return run_minimum_viable_parity_matrix(payload, request.state.user)
+
+
+@app.get('/api/prophix-final-gap-review/status')
+def prophix_final_gap_review_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return prophix_final_gap_review_status()
+
+
+@app.get('/api/prophix-final-gap-review/runs')
+def prophix_final_gap_review_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_prophix_final_gap_review_runs(limit)
+    return {'count': len(rows), 'final_gap_reviews': rows}
+
+
+@app.get('/api/prophix-final-gap-review/runs/{run_id}')
+def prophix_final_gap_review_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_prophix_final_gap_review_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/prophix-final-gap-review/run')
+def prophix_final_gap_review_run_create_endpoint(payload: ProphixFinalGapReviewRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_prophix_final_gap_review(payload.model_dump(), request.state.user)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -1884,6 +2203,28 @@ def office_adoption_proof_endpoint(request: Request, scenario_id: int = Query(..
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@app.get('/api/office/live-proof/status')
+def office_adoption_live_proof_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'reports.read')
+    return office_adoption_live_proof_status()
+
+
+@app.get('/api/office/live-proof/runs')
+def office_adoption_live_proof_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'exports.manage')
+    rows = list_office_adoption_live_proof_runs(limit)
+    return {'count': len(rows), 'live_proofs': rows}
+
+
+@app.post('/api/office/live-proof/run')
+def office_adoption_live_proof_run_endpoint(payload: OfficeAdoptionLiveProofRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'exports.manage')
+    try:
+        return run_office_adoption_live_proof(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.get('/api/office/native-workspace')
 def office_native_workspace_endpoint(request: Request, scenario_id: int = Query(..., ge=1)) -> dict[str, Any]:
     _require(request, 'reports.read')
@@ -2158,6 +2499,18 @@ def ux_department_comparison(request: Request, scenario_id: int = Query(..., ge=
 @app.get('/api/security/status')
 def security_status_endpoint() -> dict[str, Any]:
     return security_status()
+
+
+@app.get('/api/security/encryption/status')
+def security_encryption_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'security.manage')
+    return encryption_status()
+
+
+@app.post('/api/security/encryption/migrate')
+def security_encryption_migrate_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'security.manage')
+    return migrate_encrypted_fields(request.state.user.get('email', 'system'))
 
 
 @app.get('/api/security/enterprise-status')
@@ -3141,6 +3494,57 @@ def reporting_pixel_polish_run_endpoint(payload: ReportingPixelPolishRunCreate, 
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@app.get('/api/reporting/golden-test-packs/status')
+def reporting_golden_test_pack_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'reporting.manage')
+    return golden_financial_test_pack_status()
+
+
+@app.get('/api/reporting/golden-test-packs')
+def reporting_golden_test_packs_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'reporting.manage')
+    packs = load_golden_financial_test_packs()
+    return {'batch': 'B143', 'count': len(packs), 'packs': packs}
+
+
+@app.get('/api/reporting/golden-test-packs/runs')
+def reporting_golden_test_pack_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'reporting.manage')
+    rows = list_golden_financial_test_pack_runs(limit)
+    return {'count': len(rows), 'golden_runs': rows}
+
+
+@app.post('/api/reporting/golden-test-packs/run')
+def reporting_golden_test_pack_run_endpoint(request: Request, payload: dict[str, Any] = Body(default_factory=dict)) -> dict[str, Any]:
+    _require(request, 'reporting.manage')
+    try:
+        return run_golden_financial_test_packs(payload, request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/reporting/statement-accuracy-certification/status')
+def reporting_statement_accuracy_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'reporting.manage')
+    return financial_statement_accuracy_status()
+
+
+@app.get('/api/reporting/statement-accuracy-certification/runs')
+def reporting_statement_accuracy_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'reporting.manage')
+    rows = list_financial_statement_accuracy_runs(limit)
+    return {'count': len(rows), 'certification_runs': rows}
+
+
+@app.post('/api/reporting/statement-accuracy-certification/run')
+def reporting_statement_accuracy_run_endpoint(request: Request, payload: dict[str, Any] = Body(default_factory=dict)) -> dict[str, Any]:
+    _require(request, 'reporting.manage')
+    try:
+        return run_financial_statement_accuracy_certification(payload, request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.get('/api/reporting/designer-distribution/status')
 def reporting_designer_distribution_status(request: Request) -> dict[str, Any]:
     _require(request, 'reporting.manage')
@@ -3950,6 +4354,28 @@ def close_consolidation_certification_run_endpoint(payload: ConsolidationCertifi
     _require(request, 'close.manage')
     try:
         return run_consolidation_certification(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/close/consolidation-golden-cases/status')
+def close_consolidation_golden_case_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'consolidation.manage')
+    return consolidation_golden_case_status()
+
+
+@app.get('/api/close/consolidation-golden-cases/runs')
+def close_consolidation_golden_case_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'consolidation.manage')
+    rows = list_consolidation_golden_case_runs(limit)
+    return {'count': len(rows), 'golden_case_runs': rows}
+
+
+@app.post('/api/close/consolidation-golden-cases/run')
+def close_consolidation_golden_case_run_endpoint(request: Request, payload: dict[str, Any] | None = Body(default=None)) -> dict[str, Any]:
+    _require(request, 'consolidation.manage')
+    try:
+        return run_consolidation_golden_case(payload, request.state.user)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -4772,6 +5198,28 @@ def integrations_real_connector_activation_run_endpoint(payload: RealConnectorAc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.get('/api/integrations/connector-live-trial/status')
+def integrations_connector_live_trial_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'integrations.manage')
+    return connector_live_trial_status()
+
+
+@app.get('/api/integrations/connector-live-trial/runs')
+def integrations_connector_live_trial_runs_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'integrations.manage')
+    rows = list_connector_live_trial_runs()
+    return {'count': len(rows), 'live_trials': rows}
+
+
+@app.post('/api/integrations/connector-live-trial/run')
+def integrations_connector_live_trial_run_endpoint(payload: ConnectorLiveTrialRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'integrations.manage')
+    try:
+        return run_connector_live_trial(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.get('/api/integrations/campus-data-validation/status')
 def integrations_campus_data_validation_status_endpoint(request: Request) -> dict[str, Any]:
     _require(request, 'integrations.manage')
@@ -4790,6 +5238,28 @@ def integrations_run_campus_data_validation_endpoint(payload: CampusDataValidati
     _require(request, 'integrations.manage')
     try:
         return run_campus_data_validation(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get('/api/integrations/real-data-cutover-reconciliation/status')
+def integrations_real_data_cutover_reconciliation_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'integrations.manage')
+    return real_data_cutover_reconciliation_status()
+
+
+@app.get('/api/integrations/real-data-cutover-reconciliation/runs')
+def integrations_real_data_cutover_reconciliation_runs_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'integrations.manage')
+    rows = list_real_data_cutover_reconciliation_runs()
+    return {'count': len(rows), 'cutover_reconciliations': rows}
+
+
+@app.post('/api/integrations/real-data-cutover-reconciliation/run')
+def integrations_run_real_data_cutover_reconciliation_endpoint(payload: CampusDataValidationRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'integrations.manage')
+    try:
+        return run_real_data_cutover_reconciliation(payload.model_dump(), request.state.user)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -5103,6 +5573,54 @@ def data_hub_status_endpoint(request: Request) -> dict[str, Any]:
     return data_hub_status()
 
 
+@app.get('/api/data-hub/chart-of-accounts/status')
+def data_hub_coa_governance_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'reports.read')
+    return coa_governance_status()
+
+
+@app.get('/api/data-hub/chart-of-accounts/accounts')
+def data_hub_coa_governance_accounts_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'reports.read')
+    rows = list_coa_governance_accounts()
+    return {'count': len(rows), 'accounts': rows}
+
+
+@app.post('/api/data-hub/chart-of-accounts/accounts')
+def data_hub_coa_governance_upsert_account_endpoint(payload: dict[str, Any], request: Request) -> dict[str, Any]:
+    _require(request, 'dimensions.manage')
+    try:
+        return upsert_coa_governance_account(payload, request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/data-hub/chart-of-accounts/statement-mappings')
+def data_hub_coa_statement_mappings_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'reports.read')
+    rows = list_coa_statement_mappings()
+    return {'count': len(rows), 'statement_mappings': rows}
+
+
+@app.post('/api/data-hub/chart-of-accounts/seed')
+def data_hub_coa_seed_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'dimensions.manage')
+    return seed_coa_governance(request.state.user)
+
+
+@app.post('/api/data-hub/chart-of-accounts/validate')
+def data_hub_coa_validate_endpoint(request: Request, payload: dict[str, Any] | None = Body(default=None)) -> dict[str, Any]:
+    _require(request, 'dimensions.manage')
+    return validate_chart_of_accounts(payload, request.state.user)
+
+
+@app.get('/api/data-hub/chart-of-accounts/validation-runs')
+def data_hub_coa_validation_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'reports.read')
+    rows = list_coa_validation_runs(limit)
+    return {'count': len(rows), 'validation_runs': rows}
+
+
 @app.get('/api/data-hub/workspace')
 def data_hub_workspace_endpoint(request: Request, scenario_id: int | None = Query(None, ge=1)) -> dict[str, Any]:
     _require(request, 'reports.read')
@@ -5222,6 +5740,28 @@ def automation_ai_production_guardrails_run_endpoint(payload: AIProductionGuardr
     _require(request, 'automation.manage')
     try:
         return run_ai_production_guardrails(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get('/api/automation/ai-provider-live-guardrails/status')
+def automation_ai_provider_live_guardrails_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'automation.manage')
+    return ai_provider_live_guardrails_status()
+
+
+@app.get('/api/automation/ai-provider-live-guardrails/runs')
+def automation_ai_provider_live_guardrail_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'automation.manage')
+    rows = list_ai_provider_live_guardrail_runs(limit)
+    return {'count': len(rows), 'live_guardrail_runs': rows}
+
+
+@app.post('/api/automation/ai-provider-live-guardrails/run')
+def automation_ai_provider_live_guardrails_run_endpoint(payload: AIProviderLiveGuardrailRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'automation.manage')
+    try:
+        return run_ai_provider_live_guardrails(payload.model_dump(), request.state.user)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -5632,6 +6172,37 @@ def performance_run_enterprise_scale_endpoint(payload: EnterpriseScaleBenchmarkR
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.get('/api/performance/production-scale/status')
+def performance_production_scale_status_endpoint(request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    return production_scale_benchmark_status()
+
+
+@app.get('/api/performance/production-scale/runs')
+def performance_production_scale_runs_endpoint(request: Request, limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    rows = list_production_scale_benchmark_runs(limit)
+    return {'count': len(rows), 'production_scale_runs': rows}
+
+
+@app.get('/api/performance/production-scale/runs/{run_id}')
+def performance_production_scale_run_endpoint(run_id: int, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return get_production_scale_benchmark_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post('/api/performance/production-scale/run')
+def performance_run_production_scale_endpoint(payload: ProductionScaleBenchmarkRunCreate, request: Request) -> dict[str, Any]:
+    _require(request, 'operations.manage')
+    try:
+        return run_production_scale_benchmark(payload.model_dump(), request.state.user)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.post('/api/performance/proof/run')
 def performance_proof_run_endpoint(payload: PerformanceBenchmarkRunCreate, request: Request) -> dict[str, Any]:
     _require(request, 'operations.manage')
@@ -5964,7 +6535,7 @@ def foundation_ledger(
     request: Request,
     scenario_id: int = Query(..., ge=1),
     include_reversed: bool = Query(False),
-    limit: int = Query(500, ge=1, le=5000),
+    limit: int = Query(5000, ge=1, le=5000),
 ) -> dict[str, Any]:
     scenario = db.fetch_one('SELECT id FROM scenarios WHERE id = ?', (scenario_id,))
     if scenario is None:
@@ -6164,7 +6735,7 @@ def root() -> FileResponse:
 @app.get('/api/bootstrap')
 def bootstrap(request: Request) -> dict[str, Any]:
     scenarios = get_scenarios()
-    active_scenario = scenarios[0] if scenarios else None
+    active_scenario = next((scenario for scenario in scenarios if scenario.get('status') != 'evidence'), None)
     scenario_id = active_scenario['id'] if active_scenario else None
     return {
         'scenarios': scenarios,
@@ -6205,6 +6776,40 @@ def roadmap() -> dict[str, Any]:
             'self-service report builder',
         ],
     }
+
+
+def _deduplicate_api_routes() -> None:
+    """Keep router-owned API paths authoritative while legacy routes retire."""
+    seen: set[tuple[str, str]] = set()
+    kept = []
+    removed: list[dict[str, Any]] = []
+    for route in app.router.routes:
+        path = getattr(route, 'path', '')
+        methods = set(getattr(route, 'methods', set()) or set())
+        api_methods = {method for method in methods if method not in {'HEAD', 'OPTIONS'}}
+        if not path.startswith('/api') or not api_methods:
+            kept.append(route)
+            continue
+        keys = {(method, path) for method in api_methods}
+        if keys.issubset(seen):
+            removed.append({
+                'path': path,
+                'methods': sorted(api_methods),
+                'endpoint': getattr(getattr(route, 'endpoint', None), '__name__', ''),
+                'module': getattr(getattr(route, 'endpoint', None), '__module__', ''),
+            })
+            continue
+        kept.append(route)
+        seen.update(keys)
+    app.router.routes = kept
+    app.state.api_route_deduplication = {
+        'removed_count': len(removed),
+        'removed': removed,
+        'authoritative_policy': 'first_registered_route_wins',
+    }
+
+
+_deduplicate_api_routes()
 
 
 app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')

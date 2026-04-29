@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app import db
+from app.contracts.financial import LedgerPostContract
 from app.services.security import allowed_codes, has_permission, mask_sensitive_metadata, protect_metadata
 
 BACKUP_DIR = db.DATA_DIR / 'backups'
@@ -491,6 +492,7 @@ def dimension_hierarchy() -> dict[str, list[dict[str, Any]]]:
 
 
 def append_ledger_entry(payload: dict[str, Any], actor: str = 'api.user', user: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload = LedgerPostContract.model_validate(payload).model_dump()
     now = _now()
     ledger_basis = payload.get('ledger_basis') or _basis_from_ledger_type(payload.get('ledger_type') or 'planning')
     if ledger_basis not in {'actual', 'budget', 'forecast', 'scenario'}:

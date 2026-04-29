@@ -99,11 +99,14 @@
 
   function authHeaders() {
     const currentToken = token();
-    return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
+    const headers = currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
+    const csrfToken = sessionStorage.getItem('mufinances.csrf') || '';
+    if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+    return headers;
   }
 
   async function apiGet(path) {
-    const response = await fetch(path, { headers: authHeaders() });
+    const response = await fetch(path, { headers: authHeaders(), credentials: 'same-origin' });
     if (!response.ok) throw new Error((await safeJson(response)).detail || 'Chat request failed.');
     return response.json();
   }
@@ -112,6 +115,7 @@
     const response = await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      credentials: 'same-origin',
       body: JSON.stringify(payload || {}),
     });
     if (!response.ok) throw new Error((await safeJson(response)).detail || 'Chat request failed.');
@@ -149,7 +153,8 @@
   function signedIn() {
     const appShell = $('#appShell');
     const authGate = $('#authGate');
-    return Boolean(token() && appShell && !appShell.classList.contains('hidden') && (!authGate || authGate.classList.contains('hidden')));
+    const hasSession = Boolean(token() || sessionStorage.getItem('mufinances.sessionMode') === 'cookie');
+    return Boolean(hasSession && appShell && !appShell.classList.contains('hidden') && (!authGate || authGate.classList.contains('hidden')));
   }
 
   function setStatus(message) {

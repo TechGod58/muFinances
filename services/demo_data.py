@@ -29,7 +29,19 @@ class DemoDataPolicy:
 
 def policy_from_environment(env: Mapping[str, str] | None = None) -> DemoDataPolicy:
     env = env or os.environ
-    mode = RuntimeMode(str(env.get("MUFINANCES_MODE", "development")).lower())
+    mode_value = str(
+        env.get("MUFINANCES_MODE")
+        or env.get("CAMPUS_FPM_ENV")
+        or env.get("APP_ENV")
+        or "development"
+    ).lower()
+    if mode_value in {"prod", "production"}:
+        mode_value = "production"
+    elif mode_value in {"test", "testing", "ci"}:
+        mode_value = "test"
+    else:
+        mode_value = "development"
+    mode = RuntimeMode(mode_value)
     return DemoDataPolicy(
         runtime_mode=mode,
         allow_demo_seed=str(env.get("MUFINANCES_ALLOW_DEMO_SEED", "")).lower() in {"1", "true", "yes"},
@@ -74,4 +86,3 @@ class DemoDataGuard:
         if self.policy.production:
             raise PermissionDenied("Production runtime cannot use demo seed namespace")
         return f"demo:{self.policy.runtime_mode.value}"
-

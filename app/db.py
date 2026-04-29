@@ -242,19 +242,53 @@ def _release_sqlite_connection(conn: sqlite3.Connection) -> None:
 
 
 def database_runtime() -> dict[str, Any]:
+    postgres_dsn_configured = bool(POSTGRES_DSN)
+    mssql_dsn_configured = bool(MSSQL_DSN)
+    postgres_driver_available = bool(ConnectionPool is not None and psycopg is not None)
+    mssql_driver_available = pyodbc is not None
+    postgres_status = _runtime_component_status(
+        required=DB_BACKEND == 'postgres',
+        driver_available=postgres_driver_available,
+        dsn_configured=postgres_dsn_configured,
+    )
+    mssql_status = _runtime_component_status(
+        required=DB_BACKEND == 'mssql',
+        driver_available=mssql_driver_available,
+        dsn_configured=mssql_dsn_configured,
+    )
+    if DB_BACKEND == 'sqlite':
+        active_backend_status = 'ready'
+    elif DB_BACKEND == 'postgres':
+        active_backend_status = postgres_status
+    elif DB_BACKEND == 'mssql':
+        active_backend_status = mssql_status
+    else:
+        active_backend_status = 'failed'
     return {
         'backend': DB_BACKEND,
         'sqlite_path': str(DB_PATH) if DB_BACKEND == 'sqlite' else None,
-        'postgres_dsn_configured': bool(POSTGRES_DSN),
+        'postgres_dsn_configured': postgres_dsn_configured,
         'postgres_ssl_mode': DB_SSL_MODE,
-        'mssql_dsn_configured': bool(MSSQL_DSN),
+        'postgres_status': postgres_status,
+        'mssql_dsn_configured': mssql_dsn_configured,
+        'mssql_status': mssql_status,
         'pool_size': DB_POOL_SIZE,
         'pool_checked_in': _SQLITE_POOL.qsize() if DB_BACKEND == 'sqlite' else None,
         'pooling_enabled': True,
-        'postgres_driver_available': bool(ConnectionPool is not None and psycopg is not None),
-        'mssql_driver_available': pyodbc is not None,
+        'postgres_driver_available': postgres_driver_available,
+        'mssql_driver_available': mssql_driver_available,
+        'active_backend_status': active_backend_status,
+        'configuration_state': 'ready' if active_backend_status == 'ready' else 'failed',
         'sql_translation': f'{DB_BACKEND}_compatibility_layer' if DB_BACKEND in {'postgres', 'mssql'} else 'native_sqlite',
     }
+
+
+def _runtime_component_status(*, required: bool, driver_available: bool, dsn_configured: bool) -> str:
+    if not driver_available:
+        return 'failed' if required else 'not_available'
+    if not dsn_configured:
+        return 'failed' if required else 'not_configured'
+    return 'ready'
 
 
 class PostgresCursor:
@@ -3785,6 +3819,18 @@ def executemany(query: str, rows: list[tuple[Any, ...]]) -> None:
 
 
 def log_audit(entity_type: str, entity_id: str, action: str, actor: str, detail: dict[str, Any], created_at: str, conn: Any | None = None) -> None:
+    from app.contracts.financial import FinancialAuditEventContract
+
+    FinancialAuditEventContract.model_validate(
+        {
+            'entity_type': entity_type,
+            'entity_id': entity_id,
+            'action': action,
+            'actor': actor,
+            'detail': detail,
+            'created_at': created_at,
+        }
+    )
     detail_json = json.dumps(detail, sort_keys=True)
     if conn is None:
         with transaction(immediate=True) as tx:

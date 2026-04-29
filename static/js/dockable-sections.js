@@ -306,10 +306,17 @@
     popup.document.querySelector('.popout-titlebar strong').textContent = title;
     cloneStylesInto(popup.document);
 
-    popup.addEventListener('beforeunload', () => {
+    let returned = false;
+    const returnSection = () => {
+      if (returned) return;
       const liveSection = popup.document.querySelector('[data-dockable-section="true"]');
-      if (liveSection) dock(liveSection, true);
-    });
+      if (liveSection) {
+        returned = true;
+        dock(liveSection, true);
+      }
+    };
+    popup.addEventListener('beforeunload', returnSection);
+    popup.addEventListener('pagehide', returnSection);
 
     popouts.set(key, popup);
     return popup;
@@ -337,6 +344,13 @@
     popup.document.querySelector('#popoutContent').append(section);
     ensureControl(section);
     placeholder.setAttribute('aria-hidden', 'true');
+    const closeWatcher = window.setInterval(() => {
+      if (!popup.closed) return;
+      window.clearInterval(closeWatcher);
+      if (section.classList.contains(floatingClass)) {
+        dock(section, true);
+      }
+    }, 500);
 
     if (persist) {
       const undocked = readUndocked();

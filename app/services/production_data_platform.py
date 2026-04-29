@@ -70,8 +70,9 @@ def status() -> dict[str, Any]:
         'benchmark_indexes': len(BENCHMARK_INDEXES),
     }
     checks = {
-        'postgres_runtime_ready': postgres['checks']['postgres_driver_ready'] and postgres['checks']['ddl_translation_ready'],
-        'mssql_runtime_ready': postgres['checks']['mssql_driver_ready'] and postgres['checks']['mssql_ddl_translation_ready'],
+        'postgres_runtime_ready': postgres['components']['postgres']['status'] in {'ready', 'not_configured', 'not_available'} and postgres['checks']['ddl_translation_ready'],
+        'mssql_runtime_ready': postgres['components']['mssql']['status'] in {'ready', 'not_configured', 'not_available'} and postgres['checks']['mssql_ddl_translation_ready'],
+        'active_backend_ready': runtime['active_backend_status'] == 'ready',
         'production_dsn_hooks_ready': _dsn_hooks_ready(runtime),
         'connection_pooling_ready': runtime['pooling_enabled'] and int(runtime['pool_size']) >= 1,
         'migration_rehearsal_ready': _migration_rehearsal()['complete'],
@@ -228,6 +229,9 @@ def _dsn_hooks_ready(runtime: dict[str, Any]) -> bool:
     return (
         'postgres_dsn_configured' in runtime
         and 'mssql_dsn_configured' in runtime
+        and runtime.get('postgres_status') in {'ready', 'not_configured', 'not_available'}
+        and runtime.get('mssql_status') in {'ready', 'not_configured', 'not_available'}
+        and runtime.get('active_backend_status') == 'ready'
         and runtime['backend'] in {'sqlite', 'postgres', 'mssql'}
     )
 

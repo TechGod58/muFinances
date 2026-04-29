@@ -1,0 +1,49 @@
+{
+  "case_key": "b145-campus-consolidation-golden",
+  "period": "2026-12",
+  "expected": {
+    "effective_ownership_percent": 72.0,
+    "minority_interest_percent": 28.0,
+    "intercompany_status": "matched",
+    "elimination_review_status": "approved",
+    "journal_types": [
+      "consolidated_book",
+      "currency_translation_adjustment",
+      "gaap_adjustment",
+      "non_controlling_interest"
+    ],
+    "supplemental_schedule_types": [
+      "currency_translation_adjustment",
+      "minority_interest",
+      "multi_book_bridge",
+      "ownership_chain"
+    ],
+    "advanced_totals": {
+      "cta_amount": 4950.0,
+      "gaap_adjustment": 4131.0,
+      "non_controlling_interest": 11550.0,
+      "owned_amount": 110700.0,
+      "source_amount": 114000.0,
+      "translated_amount": 122250.0
+    },
+    "audit_report_sections": [
+      "consolidation_journals",
+      "controls",
+      "currency_rates",
+      "currency_translation_adjustments",
+      "eliminations",
+      "entity_hierarchy",
+      "gaap_book_mappings",
+      "ownership_chain_calculations",
+      "ownerships",
+      "run",
+      "settings",
+      "statutory_packs",
+      "supplemental_schedules"
+    ],
+    "multi_book_placeholder": {
+      "source_gaap_basis": "IFRS",
+      "target_gaap_basis": "US_GAAP"
+    }
+  }
+}

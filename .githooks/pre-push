@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+protected_branch="main"
+
+while read local_ref local_sha remote_ref remote_sha
+do
+  branch="${remote_ref#refs/heads/}"
+  if [ "$branch" = "$protected_branch" ]; then
+    echo "Direct pushes to '$protected_branch' are blocked for muFinances." >&2
+    echo "Create a feature branch and open a pull request instead." >&2
+    exit 1
+  fi
+done
+
+exit 0

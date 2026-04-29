@@ -87,7 +87,9 @@
       const token = localStorage.getItem('mufinances.token') || '';
       const headers = { Accept: 'application/json' };
       if (token) headers.Authorization = `Bearer ${token}`;
-      const response = await fetch('/api/admin/production-readiness-dashboard', { headers });
+      const csrfToken = sessionStorage.getItem('mufinances.csrf') || '';
+      if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+      const response = await fetch('/api/admin/production-readiness-dashboard', { headers, credentials: 'same-origin' });
       if (response.ok) return await response.json();
     } catch {
       // Fall back to local dashboard.

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from app import db
+from app.contracts.financial import ReportDefinitionContract
 from app.services.foundation import summary_by_dimensions
 
 EXPORT_DIR = db.DATA_DIR / 'exports'
@@ -350,6 +351,7 @@ def run_reporting_output_completion(scenario_id: int, user: dict[str, Any]) -> d
 
 
 def create_report_definition(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    payload = ReportDefinitionContract.model_validate(payload).model_dump()
     now = _now()
     report_id = db.execute(
         '''

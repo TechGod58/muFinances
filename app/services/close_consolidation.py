@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app import db
+from app.contracts.financial import CloseReconciliationContract, ConsolidationRunContract
 from app.services.foundation import append_ledger_entry
 from app.services.evidence import packet_evidence_links
 
@@ -141,6 +142,7 @@ def complete_checklist_item(item_id: int, evidence: dict[str, Any], user: dict[s
 
 
 def create_reconciliation(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    payload = CloseReconciliationContract.model_validate(payload).model_dump()
     _ensure_period_open(payload['scenario_id'], payload['period'])
     book_balance = _ledger_balance(
         payload['scenario_id'], payload['period'], payload['entity_code'], payload['account_code']
@@ -305,6 +307,7 @@ def get_elimination(elimination_id: int) -> dict[str, Any]:
 
 
 def run_consolidation(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    payload = ConsolidationRunContract.model_validate(payload).model_dump()
     _ensure_period_open(payload['scenario_id'], payload['period'])
     total_before = _period_total(payload['scenario_id'], payload['period'], include_eliminations=False)
     eliminations = _period_eliminations(payload['scenario_id'], payload['period'])

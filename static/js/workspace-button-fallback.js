@@ -319,7 +319,9 @@
         font-weight: 700 !important;
         min-height: 42px !important;
         padding: 0 14px !important;
+        position: relative !important;
         white-space: nowrap !important;
+        z-index: 520 !important;
       }
       .hero-actions {
         gap: 8px !important;
@@ -491,11 +493,19 @@
     const tray = document.querySelector(`#${trayId}`);
     const button = document.querySelector(`#${buttonId}`);
     if (!tray || !button) return;
+    if (open) positionTray(tray, button);
     tray.classList.toggle(openClass, open);
     tray.hidden = !open;
     button.classList.toggle(activeClass, open);
     button.setAttribute('aria-expanded', String(open));
     localStorage.setItem(menuOpenKey, open ? 'true' : 'false');
+  }
+
+  function positionTray(tray, button) {
+    const rect = button.getBoundingClientRect();
+    const top = Math.max(82, Math.min(window.innerHeight - 180, rect.bottom + 10));
+    tray.style.setProperty('top', `${top}px`, 'important');
+    tray.style.setProperty('max-height', `calc(100vh - ${top + 18}px)`, 'important');
   }
 
   function sync() {
@@ -526,6 +536,7 @@
     }
 
     const tray = ensureTray();
+    positionTray(tray, button);
     const active = readActive();
     const activeNumbers = readActiveNumbers();
     const emptyState = ensureEmptyState();
