@@ -1,3 +1,10 @@
+<!-- WIP-BANNER:START -->
+> [!IMPORTANT]
+> **Status: Work in Progress**
+>
+> This repository is under active development. Content, structure, and implementation details may change frequently.
+<!-- WIP-BANNER:END -->
+
 # Campus FPM Base
 
 A local-first financial performance management scaffold for replacing Prophix on campus.
